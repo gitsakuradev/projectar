@@ -1,31 +1,63 @@
-/* Глобальные стили, улучшающие мобильное поведение и canvas */
-/* Сохраните/обновите файл: src/index.css */
+/* Глобальные стили с улучшенной мобильной поддержкой */
 
 html, body, #root {
   height: 100%;
   margin: 0;
+  padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 body {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   background: #05050a;
   color: #fff;
+  
+  /* Оптимизация производительности на мобильных */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
 }
 
-/* canvas full screen and touch handling */
-canvas, .three-canvas, #root > div canvas {
+/* Улучшенная поддержка canvas и Three.js */
+canvas {
+  display: block;
+  touch-action: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+  outline: none;
+}
+
+.three-canvas,
+#root > div canvas {
   width: 100% !important;
   height: 100% !important;
-  display: block;
-  touch-action: none; /* important: prevents browser from interpreting touch as scroll/pinch */
-  -webkit-tap-highlight-color: transparent;
 }
 
-/* prevent overscroll jump when panning */
-body, html {
-  overscroll-behavior: contain;
+/* AR.js специфичные стили */
+a-scene {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+a-scene canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* Скрываем дефолтные UI элементы AR.js */
+.a-loader-title,
+.a-enter-vr-button,
+.a-enter-ar-button,
+.a-orientation-modal {
+  display: none !important;
 }
 
 /* AR overlay hint */
@@ -37,28 +69,180 @@ body, html {
   display: flex;
   justify-content: center;
   pointer-events: none;
-}
-.ar-overlay .hint {
-  pointer-events: auto;
-  background: rgba(0,0,0,0.6);
-  color: white;
-  padding: 10px 14px;
-  border-radius: 12px;
+  z-index: 1000;
 }
 
-/* Buttons */
+.ar-overlay .hint {
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  color: white;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Кнопки */
 .btn {
   cursor: pointer;
   border: none;
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.08);
   color: white;
-  border-radius: 10px;
-  transition: all 160ms ease;
+  border-radius: 12px;
+  transition: all 200ms ease;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 1rem;
+  padding: 0.8rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  -webkit-tap-highlight-color: transparent;
 }
-.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
-.btn-outline { background: transparent; border: 2px solid rgba(255,255,255,0.12); }
 
-/* responsive adjustments */
-@media (max-width: 640px) {
-  .btn { padding: 8px 10px; font-size: 0.95rem; }
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Анимации для загрузки */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.loading-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 768px) {
+  .btn {
+    padding: 0.7rem 1.2rem;
+    font-size: 0.9rem;
+  }
+  
+  .ar-overlay .hint {
+    font-size: 0.85rem;
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .ar-overlay .hint {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+}
+
+/* Оптимизация для высоких DPI экранов */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  body {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+}
+
+/* Улучшение производительности анимаций */
+* {
+  box-sizing: border-box;
+}
+
+*:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Скроллбары */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* iOS Safari специфичные фиксы */
+@supports (-webkit-touch-callout: none) {
+  body {
+    /* Фикс для iOS Safari bottom bar */
+    min-height: -webkit-fill-available;
+  }
+  
+  #root {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Предотвращение выделения текста на мобильных при жестах */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
