@@ -6,6 +6,7 @@ function Gallery3D() {
   const { subject = 'geometry' } = useParams()
   const canvasRef = useRef<HTMLDivElement>(null)
   const [currentModel, setCurrentModel] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -88,10 +89,8 @@ function Gallery3D() {
     pointLight2.position.set(-5, -5, 5)
     scene.add(pointLight2)
 
-    // Очищаем предыдущие модели
     modelsRef.current = []
 
-    // Создание моделей в зависимости от предмета
     if (subject === 'geometry') {
       createGeometryModels()
     } else if (subject === 'biology') {
@@ -103,6 +102,8 @@ function Gallery3D() {
     }
 
     scene.add(modelsRef.current[0])
+    
+    setTimeout(() => setIsLoading(false), 500)
 
     let frameId: number
     const animate = () => {
@@ -220,14 +221,14 @@ function Gallery3D() {
     nucleolus.position.set(0.2, 0.1, 0)
     cellGroup.add(nucleolus)
 
-    // Митохондрии (энергетические станции) - 8 штук
+    // Митохондрии (энергетические станции) - 8 штук - ИСПРАВЛЕНО: CylinderGeometry вместо CapsuleGeometry
     for (let i = 0; i < 8; i++) {
       const angle = (i / 8) * Math.PI * 2
       const radius = 1
       const mitoGroup = new THREE.Group()
       
       const mitoBody = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.12, 0.35, 8, 16),
+        new THREE.CylinderGeometry(0.12, 0.12, 0.35, 8, 16),
         new THREE.MeshStandardMaterial({ 
           color: 0xff6b6b,
           roughness: 0.3,
@@ -892,7 +893,7 @@ function Gallery3D() {
       new THREE.Vector3(-0.565, -0.4, -0.98)
     ]
 
-    tetrahedralPositions.forEach((pos, _index) => {
+    tetrahedralPositions.forEach((pos) => {
       // Водород
       const h = new THREE.Mesh(
         new THREE.SphereGeometry(0.28, 32, 32),
@@ -1015,7 +1016,7 @@ function Gallery3D() {
     }
 
     // Электронные облака
-    [oxygen1, oxygen2].forEach(o => {
+    ;[oxygen1, oxygen2].forEach(o => {
       const cloud = new THREE.Mesh(
         new THREE.SphereGeometry(0.6, 32, 32),
         new THREE.MeshStandardMaterial({ 
@@ -1289,6 +1290,27 @@ function Gallery3D() {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
+      {isLoading && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: currentSubject.color,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 200,
+          color: 'white',
+          fontSize: '1.5rem',
+          flexDirection: 'column'
+        }}>
+          <div style={{fontSize: '4rem', marginBottom: '1rem'}}>{currentSubject.emoji}</div>
+          <div>Загрузка 3D моделей...</div>
+        </div>
+      )}
+
       <div ref={canvasRef} style={{ width: '100%', height: '100%' }} />
 
       <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100 }}>
@@ -1361,22 +1383,3 @@ function Gallery3D() {
             {model.name.split(' ')[0]}
           </button>
         ))}
-      </div>
-
-      <div style={{
-        position: 'absolute',
-        bottom: '120px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: '0.9rem',
-        textAlign: 'center',
-        zIndex: 100
-      }}>
-        🖱️ Модели вращаются автоматически
-      </div>
-    </div>
-  )
-}
-
-export default Gallery3D
