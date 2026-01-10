@@ -1,9 +1,11 @@
 // Минимальная декларация для OrbitControls из three/examples/jsm/controls/OrbitControls
 // Помогает TypeScript при импорте примеров three.
+// Сохраните файл: src/types/three-examples.d.ts
+
 import { Camera, Event, MOUSE, TOUCH, Vector3 } from 'three';
 
 declare module 'three/examples/jsm/controls/OrbitControls' {
-  import { Camera, MOUSE, TOUCH, Vector3 } from 'three';
+  import { Camera, Event, Vector3 } from 'three';
   export class OrbitControls {
     constructor(object: Camera, domElement?: HTMLElement);
     enabled: boolean;
