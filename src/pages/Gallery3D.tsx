@@ -892,7 +892,7 @@ function Gallery3D() {
       new THREE.Vector3(-0.565, -0.4, -0.98)
     ]
 
-    tetrahedralPositions.forEach((pos, index) => {
+    tetrahedralPositions.forEach((pos, _index) => {
       // Водород
       const h = new THREE.Mesh(
         new THREE.SphereGeometry(0.28, 32, 32),
