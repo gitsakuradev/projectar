@@ -129,7 +129,7 @@ function Gallery3D() {
     return () => {
       window.removeEventListener('resize', handleResize)
       cancelAnimationFrame(frameId)
-      if (canvasRef.current && renderer.domElement) {
+      if (canvasRef.current && renderer.domElement && canvasRef.current.contains(renderer.domElement)) {
         canvasRef.current.removeChild(renderer.domElement)
       }
       renderer.dispose()
@@ -172,7 +172,7 @@ function Gallery3D() {
     // Модель 1: Детализированная клетка
     const cellGroup = new THREE.Group()
     
-    // Клеточная мембрана (двойной слой)
+    // Клеточная мембрана
     const cellBody = new THREE.Mesh(
       new THREE.SphereGeometry(1.5, 64, 64),
       new THREE.MeshStandardMaterial({ 
@@ -197,7 +197,7 @@ function Gallery3D() {
     )
     cellGroup.add(innerMembrane)
 
-    // Ядро с двойной оболочкой
+    // Ядро
     const nucleus = new THREE.Mesh(
       new THREE.SphereGeometry(0.6, 32, 32),
       new THREE.MeshStandardMaterial({ 
@@ -221,7 +221,7 @@ function Gallery3D() {
     nucleolus.position.set(0.2, 0.1, 0)
     cellGroup.add(nucleolus)
 
-    // Митохондрии (энергетические станции) - 8 штук - ИСПРАВЛЕНО: CylinderGeometry вместо CapsuleGeometry
+    // Митохондрии - используем CylinderGeometry вместо CapsuleGeometry
     for (let i = 0; i < 8; i++) {
       const angle = (i / 8) * Math.PI * 2
       const radius = 1
@@ -265,7 +265,7 @@ function Gallery3D() {
       cellGroup.add(mitoGroup)
     }
 
-    // Эндоплазматический ретикулум (складки)
+    // Эндоплазматический ретикулум
     for (let i = 0; i < 15; i++) {
       const erSegment = new THREE.Mesh(
         new THREE.TorusGeometry(0.15 + i * 0.05, 0.02, 8, 16),
@@ -285,7 +285,7 @@ function Gallery3D() {
       cellGroup.add(erSegment)
     }
 
-    // Рибосомы (маленькие точки)
+    // Рибосомы
     for (let i = 0; i < 40; i++) {
       const ribosome = new THREE.Mesh(
         new THREE.SphereGeometry(0.04, 8, 8),
@@ -306,7 +306,7 @@ function Gallery3D() {
       cellGroup.add(ribosome)
     }
 
-    // Аппарат Гольджи (стопка дисков)
+    // Аппарат Гольджи
     const golgiGroup = new THREE.Group()
     for (let i = 0; i < 6; i++) {
       const disc = new THREE.Mesh(
@@ -325,7 +325,7 @@ function Gallery3D() {
 
     modelsRef.current.push(cellGroup)
 
-    // Модель 2: Детализированная ДНК
+    // Модель 2: ДНК
     const dnaGroup = new THREE.Group()
     const segments = 80
     const helixRadius = 0.6
@@ -335,7 +335,7 @@ function Gallery3D() {
       const t = (i / segments) * Math.PI * 4
       const y = (i / segments) * helixHeight - helixHeight / 2
 
-      // Первая нить (синяя)
+      // Первая нить
       const sphere1 = new THREE.Mesh(
         new THREE.SphereGeometry(0.12, 16, 16),
         new THREE.MeshStandardMaterial({ 
@@ -353,7 +353,7 @@ function Gallery3D() {
       )
       dnaGroup.add(sphere1)
 
-      // Вторая нить (красная)
+      // Вторая нить
       const sphere2 = new THREE.Mesh(
         new THREE.SphereGeometry(0.12, 16, 16),
         new THREE.MeshStandardMaterial({ 
@@ -371,7 +371,7 @@ function Gallery3D() {
       )
       dnaGroup.add(sphere2)
 
-      // Связи между нитями (водородные мостики)
+      // Связи между нитями
       if (i % 2 === 0) {
         const bondGeometry = new THREE.CylinderGeometry(0.04, 0.04, helixRadius * 2, 8)
         const bondMaterial = new THREE.MeshStandardMaterial({ 
@@ -386,7 +386,7 @@ function Gallery3D() {
         bond.rotation.y = t
         dnaGroup.add(bond)
 
-        // Азотистые основания (разноцветные)
+        // Азотистые основания
         const baseColors = [0xffff00, 0x00ff00, 0xff00ff, 0x00ffff]
         const base1 = new THREE.Mesh(
           new THREE.BoxGeometry(0.15, 0.08, 0.08),
@@ -431,10 +431,10 @@ function Gallery3D() {
 
     modelsRef.current.push(dnaGroup)
 
-    // Модель 3: Анатомическое сердце
+    // Модель 3: Сердце
     const heartGroup = new THREE.Group()
     
-    // Левый желудочек (большая нижняя камера)
+    // Левый желудочек
     const leftVentricle = new THREE.Mesh(
       new THREE.SphereGeometry(0.7, 32, 32),
       new THREE.MeshStandardMaterial({ 
@@ -484,7 +484,7 @@ function Gallery3D() {
     rightAtrium.position.set(0.4, 0.5, 0)
     heartGroup.add(rightAtrium)
 
-    // Аорта (главная артерия)
+    // Аорта
     const aorta = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.15, 1, 16),
       new THREE.MeshStandardMaterial({ 
@@ -510,7 +510,7 @@ function Gallery3D() {
     pulmonaryArtery.rotation.z = -0.2
     heartGroup.add(pulmonaryArtery)
 
-    // Вены (полые вены)
+    // Полые вены
     const superiorVenaCava = new THREE.Mesh(
       new THREE.CylinderGeometry(0.12, 0.15, 0.6, 16),
       new THREE.MeshStandardMaterial({ 
@@ -522,7 +522,7 @@ function Gallery3D() {
     superiorVenaCava.position.set(0.5, 1, -0.1)
     heartGroup.add(superiorVenaCava)
 
-    // Коронарные артерии (на поверхности)
+    // Коронарные артерии
     for (let i = 0; i < 12; i++) {
       const angle = (i / 12) * Math.PI * 2
       const coronary = new THREE.Mesh(
@@ -543,7 +543,7 @@ function Gallery3D() {
       heartGroup.add(coronary)
     }
 
-    // Клапаны (визуализация)
+    // Клапаны
     const mitralValve = new THREE.Mesh(
       new THREE.TorusGeometry(0.15, 0.03, 16, 32),
       new THREE.MeshStandardMaterial({ 
@@ -559,7 +559,7 @@ function Gallery3D() {
     heartGroup.scale.set(1.3, 1.3, 1.3)
     modelsRef.current.push(heartGroup)
 
-    // Модель 4: Детальный нейрон
+    // Модель 4: Нейрон
     const neuronGroup = new THREE.Group()
     
     // Тело клетки (сома)
@@ -573,7 +573,7 @@ function Gallery3D() {
     )
     neuronGroup.add(soma)
 
-    // Ядро в соме
+    // Ядро
     const neuronNucleus = new THREE.Mesh(
       new THREE.SphereGeometry(0.25, 32, 32),
       new THREE.MeshStandardMaterial({ 
@@ -584,12 +584,11 @@ function Gallery3D() {
     )
     neuronGroup.add(neuronNucleus)
 
-    // Дендриты (входные отростки) - разветвлённые
+    // Дендриты
     for (let i = 0; i < 8; i++) {
       const angle = (i / 8) * Math.PI * 2
       const dendriteGroup = new THREE.Group()
       
-      // Главный дендрит
       const mainDendrite = new THREE.Mesh(
         new THREE.CylinderGeometry(0.08, 0.05, 1.2, 8),
         new THREE.MeshStandardMaterial({ 
@@ -600,7 +599,7 @@ function Gallery3D() {
       mainDendrite.position.y = 0.6
       dendriteGroup.add(mainDendrite)
 
-      // Ветвления дендрита
+      // Ветвления
       for (let j = 0; j < 3; j++) {
         const branch = new THREE.Mesh(
           new THREE.CylinderGeometry(0.04, 0.02, 0.6, 8),
@@ -617,7 +616,7 @@ function Gallery3D() {
         branch.rotation.z = (Math.random() - 0.5) * Math.PI / 3
         dendriteGroup.add(branch)
 
-        // Мелкие шипики на ветвлениях
+        // Шипики
         for (let k = 0; k < 5; k++) {
           const spine = new THREE.Mesh(
             new THREE.SphereGeometry(0.025, 8, 8),
@@ -646,7 +645,7 @@ function Gallery3D() {
       neuronGroup.add(dendriteGroup)
     }
 
-    // Аксон (длинный выходной отросток)
+    // Аксон
     const axonSegments = 15
     for (let i = 0; i < axonSegments; i++) {
       const segment = new THREE.Mesh(
@@ -662,7 +661,7 @@ function Gallery3D() {
       segment.rotation.z = Math.sin(i * 0.3) * 0.1
       neuronGroup.add(segment)
 
-      // Миелиновая оболочка (белая изоляция)
+      // Миелиновая оболочка
       if (i % 3 !== 0) {
         const myelin = new THREE.Mesh(
           new THREE.CylinderGeometry(0.15, 0.15, 0.35, 12),
@@ -678,7 +677,7 @@ function Gallery3D() {
       }
     }
 
-    // Терминальные окончания (синапсы)
+    // Терминальные окончания
     const terminalY = -0.7 - axonSegments * 0.38
     for (let i = 0; i < 5; i++) {
       const terminal = new THREE.Mesh(
@@ -699,12 +698,11 @@ function Gallery3D() {
       )
       neuronGroup.add(terminal)
 
-      // Нейромедиаторы (маленькие точки)
+      // Нейромедиаторы
       for (let j = 0; j < 8; j++) {
         const neurotransmitter = new THREE.Mesh(
           new THREE.SphereGeometry(0.03, 8, 8),
-          new THREE.MeshStandardMaterial({ 
-            color: 0xffff00,
+          new THREE.MeshStandardMaterial({color: 0xffff00,
             emissive: 0xffff00,
             emissiveIntensity: 0.5
           })
@@ -723,10 +721,31 @@ function Gallery3D() {
   }
 
   const createChemistryModels = () => {
-    // Модель 1: Детальная молекула H2O
+    // Функция для создания меток атомов
+    const createAtomLabel = (text: string, position: THREE.Vector3, color: number) => {
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      if (context) {
+        canvas.width = 128
+        canvas.height = 128
+        context.fillStyle = `#${color.toString(16).padStart(6, '0')}`
+        context.font = 'Bold 60px Arial'
+        context.textAlign = 'center'
+        context.textBaseline = 'middle'
+        context.fillText(text, 64, 64)
+      }
+      const texture = new THREE.CanvasTexture(canvas)
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture })
+      const sprite = new THREE.Sprite(spriteMaterial)
+      sprite.position.copy(position)
+      sprite.scale.set(0.5, 0.5, 1)
+      return sprite
+    }
+
+    // Модель 1: H2O
     const h2oGroup = new THREE.Group()
     
-    // Кислород (большой красный)
+    // Кислород
     const oxygen = new THREE.Mesh(
       new THREE.SphereGeometry(0.5, 32, 32),
       new THREE.MeshStandardMaterial({ 
@@ -751,7 +770,7 @@ function Gallery3D() {
     )
     h2oGroup.add(oxygenCloud)
 
-    // Водород 1 (маленький белый)
+    // Водород 1
     const hydrogen1 = new THREE.Mesh(
       new THREE.SphereGeometry(0.3, 32, 32),
       new THREE.MeshStandardMaterial({ 
@@ -797,7 +816,7 @@ function Gallery3D() {
     h2Cloud.position.copy(hydrogen2.position)
     h2oGroup.add(h2Cloud)
 
-    // Ковалентные связи (двойные цилиндры)
+    // Ковалентные связи
     const bond1 = new THREE.Mesh(
       new THREE.CylinderGeometry(0.06, 0.06, 1, 16),
       new THREE.MeshStandardMaterial({ 
@@ -823,31 +842,11 @@ function Gallery3D() {
     h2oGroup.add(bond2)
 
     // Метки атомов
-    const createAtomLabel = (text: string, position: THREE.Vector3, color: number) => {
-      const canvas = document.createElement('canvas')
-      const context = canvas.getContext('2d')
-      if (context) {
-        canvas.width = 128
-        canvas.height = 128
-        context.fillStyle = `#${color.toString(16).padStart(6, '0')}`
-        context.font = 'Bold 60px Arial'
-        context.textAlign = 'center'
-        context.textBaseline = 'middle'
-        context.fillText(text, 64, 64)
-      }
-      const texture = new THREE.CanvasTexture(canvas)
-      const spriteMaterial = new THREE.SpriteMaterial({ map: texture })
-      const sprite = new THREE.Sprite(spriteMaterial)
-      sprite.position.copy(position)
-      sprite.scale.set(0.5, 0.5, 1)
-      return sprite
-    }
-
     h2oGroup.add(createAtomLabel('O', new THREE.Vector3(0, -0.7, 0), 0xff0000))
     h2oGroup.add(createAtomLabel('H', new THREE.Vector3(0.75, 0.85, 0), 0xffffff))
     h2oGroup.add(createAtomLabel('H', new THREE.Vector3(-0.75, 0.85, 0), 0xffffff))
 
-    // Диполь (стрелка)
+    // Диполь
     const arrowHelper = new THREE.ArrowHelper(
       new THREE.Vector3(0, 1, 0),
       new THREE.Vector3(0, -0.3, 0),
@@ -861,10 +860,10 @@ function Gallery3D() {
     h2oGroup.scale.set(1.5, 1.5, 1.5)
     modelsRef.current.push(h2oGroup)
 
-    // Модель 2: CH4 (метан) - тетраэдр
+    // Модель 2: CH4
     const ch4Group = new THREE.Group()
     
-    // Углерод (чёрный)
+    // Углерод
     const carbon = new THREE.Mesh(
       new THREE.SphereGeometry(0.45, 32, 32),
       new THREE.MeshStandardMaterial({ 
@@ -945,10 +944,10 @@ function Gallery3D() {
     ch4Group.scale.set(1.2, 1.2, 1.2)
     modelsRef.current.push(ch4Group)
 
-    // Модель 3: CO2 (углекислый газ) - линейная
+    // Модель 3: CO2
     const co2Group = new THREE.Group()
     
-    // Углерод (центр)
+    // Углерод
     const carbonCO2 = new THREE.Mesh(
       new THREE.SphereGeometry(0.45, 32, 32),
       new THREE.MeshStandardMaterial({ 
@@ -986,7 +985,7 @@ function Gallery3D() {
     oxygen2.position.x = -1.4
     co2Group.add(oxygen2)
 
-    // Двойные связи C=O (две линии)
+    // Двойные связи C=O
     for (let i = 0; i < 2; i++) {
       const offset = i === 0 ? 0.08 : -0.08
       
@@ -1037,7 +1036,7 @@ function Gallery3D() {
     co2Group.scale.set(1.3, 1.3, 1.3)
     modelsRef.current.push(co2Group)
 
-    // Модель 4: NaCl (кристаллическая решётка)
+    // Модель 4: NaCl
     const naclGroup = new THREE.Group()
     
     const latticeSize = 3
@@ -1074,7 +1073,7 @@ function Gallery3D() {
           ionCloud.position.copy(atom.position)
           naclGroup.add(ionCloud)
 
-          // Связи (только для видимых соединений)
+          // Связи
           if (x < latticeSize) {
             const bond = new THREE.Mesh(
               new THREE.CylinderGeometry(0.03, 0.03, spacing, 8),
@@ -1383,3 +1382,9 @@ function Gallery3D() {
             {model.name.split(' ')[0]}
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+export default Gallery3D
