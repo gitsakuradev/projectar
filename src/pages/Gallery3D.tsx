@@ -664,7 +664,7 @@ function Gallery3D() {
       // Миелиновая оболочка (белая изоляция)
       if (i % 3 !== 0) {
         const myelin = new THREE.Mesh(
-          new THREE:CylinderGeometry(0.15, 0.15, 0.35, 12),
+          new THREE.CylinderGeometry(0.15, 0.15, 0.35, 12),
           new THREE.MeshStandardMaterial({ 
             color: 0xfffafa,
             roughness: 0.2,
