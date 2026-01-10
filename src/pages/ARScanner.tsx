@@ -1,20 +1,8 @@
-// ARScanner.tsx — компонент AR-сканера с упором на стабильность на мобильных.
-// Поддержка двух путей:
-// 1) model-viewer (fallback & quick AR on Android/iOS) — легкий путь.
-// 2) Если установлен MindAR (mindar-image-three) — можно подключить marker-based AR.
-// Этот файл даёт рабочую структуру и fallback; при желании я могу расширить mindar-реализацию.
-// Сохраните файл: src/pages/ARScanner.tsx
-
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-// NOTE: model-viewer не типизирован по умолчанию в TSX — используем any.
-// Для model-viewer: npm i @google/model-viewer
-// Для mindar marker-based AR: npm i mindar-image-three three
-// Здесь мы помещаем model-viewer fallback (работает в большинстве мобильных браузеров).
-
+// NOTE: model-viewer not typed by default in TSX — allow usage
 declare global {
-  // allow <model-viewer /> in JSX without TS error
   namespace JSX {
     interface IntrinsicElements {
       'model-viewer': any
@@ -23,29 +11,15 @@ declare global {
 }
 
 const ARScanner: React.FC = () => {
-  const [isSupported, setIsSupported] = useState<boolean | null>(null)
   const [arOpen, setArOpen] = useState(false)
   const modelViewerRef = useRef<any>(null)
 
   useEffect(() => {
-    // Quick detection for WebXR or model-viewer availability on mobile.
-    // model-viewer fallback works with Scene Viewer (Android) and Quick Look (iOS).
-    const check = async () => {
-      try {
-        // basic feature detect (model-viewer generally works)
-        setIsSupported(true)
-      } catch (e) {
-        setIsSupported(false)
-      }
-    }
-    check()
+    // minimal setup or feature-detect could be added here later
   }, [])
 
-  // Example handler that triggers AR via model-viewer
   const openAR = () => {
     setArOpen(true)
-    // If model-viewer is present, we can call showPoster or enter AR programmatically
-    // (browser support dependent)
     setTimeout(() => {
       try {
         const mv = modelViewerRef.current
@@ -72,14 +46,11 @@ const ARScanner: React.FC = () => {
         <button onClick={() => window.open('/markers', '_blank')} className="btn btn-outline" style={{ padding: '10px 16px' }}>Посмотреть маркеры</button>
       </div>
 
-      {/* Model viewer fallback — замените src на реальную модель (glb/glTF) */}
       {arOpen && (
         <div style={{ marginTop: 20 }}>
-          {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <model-viewer
             ref={modelViewerRef}
-            src="/models/cube.glb"               /* <- поместите модель в public/models/ */
-            ios-src=""
+            src="/models/cube.glb"
             alt="AR model"
             ar
             ar-modes="webxr scene-viewer quick-look"
