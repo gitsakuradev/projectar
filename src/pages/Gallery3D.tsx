@@ -93,13 +93,13 @@ function Gallery3D() {
 
     // Создание моделей в зависимости от предмета
     if (subject === 'geometry') {
-      createGeometryModels(scene)
+      createGeometryModels()
     } else if (subject === 'biology') {
-      createBiologyModels(scene)
+      createBiologyModels()
     } else if (subject === 'chemistry') {
-      createChemistryModels(scene)
+      createChemistryModels()
     } else if (subject === 'physics') {
-      createPhysicsModels(scene)
+      createPhysicsModels()
     }
 
     scene.add(modelsRef.current[0])
@@ -135,7 +135,7 @@ function Gallery3D() {
     }
   }, [subject])
 
-  const createGeometryModels = (scene: THREE.Scene) => {
+  const createGeometryModels = () => {
     // Куб
     const cubeGeometry = new THREE.BoxGeometry(2, 2, 2)
     const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x667eea, metalness: 0.3, roughness: 0.4 })
@@ -167,7 +167,7 @@ function Gallery3D() {
     modelsRef.current.push(cylinder)
   }
 
-  const createBiologyModels = (scene: THREE.Scene) => {
+  const createBiologyModels = () => {
     // Клетка
     const cellGroup = new THREE.Group()
     const cellBody = new THREE.Mesh(
@@ -257,7 +257,7 @@ function Gallery3D() {
     modelsRef.current.push(neuronGroup)
   }
 
-  const createChemistryModels = (scene: THREE.Scene) => {
+  const createChemistryModels = () => {
     // H2O
     const h2oGroup = new THREE.Group()
     const oxygen = new THREE.Mesh(
@@ -359,7 +359,6 @@ function Gallery3D() {
 
     // NaCl
     const naclGroup = new THREE.Group()
-    const size = 3
     for (let x = -1; x <= 1; x++) {
       for (let y = -1; y <= 1; y++) {
         for (let z = -1; z <= 1; z++) {
@@ -379,7 +378,7 @@ function Gallery3D() {
     modelsRef.current.push(naclGroup)
   }
 
-  const createPhysicsModels = (scene: THREE.Scene) => {
+  const createPhysicsModels = () => {
     // Электрическая цепь
     const circuitGroup = new THREE.Group()
     
