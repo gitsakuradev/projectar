@@ -1249,7 +1249,7 @@ function Gallery3D() {
     modelsRef.current.push(atomGroup)
   }
 
-  const animateModel = (model: THREE.Object3D, index: number, subj: string) => {
+  const animateModel = (model: THREE.Object3D, _index: number, subj: string) => {
     model.rotation.y += 0.005
 
     if (subj === 'biology') {
