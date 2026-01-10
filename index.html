@@ -3,12 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>AR Блокнот</title>
     
-    <!-- AR.js и A-Frame -->
+    <!-- AR.js и A-Frame - правильный порядок загрузки -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+      /* Предотвращение случайных скроллов на мобильных */
+      body {
+        touch-action: pan-x pan-y;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      
+      /* Оптимизация canvas для AR */
+      a-scene canvas {
+        touch-action: none !important;
+      }
+      
+      /* Убираем всплывающие элементы AR.js */
+      .a-loader-title,
+      .a-enter-vr-button,
+      .a-dialog {
+        display: none !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
