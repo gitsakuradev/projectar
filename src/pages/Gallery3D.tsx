@@ -1,3 +1,7 @@
+// Вот исправленный файл Gallery3D.tsx — в нём заменено присваивание
+// renderer.physicallyCorrectLights = true на (renderer as any).physicallyCorrectLights = true
+// остальная логика оставлена без изменений (как в вашем последнем варианте).
+
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import * as THREE from 'three'
@@ -56,7 +60,7 @@ function Gallery3D() {
         { name: '🔌 Цепь', description: 'Электрическая цепь с источником тока' },
         { name: '🧲 Магнит', description: 'Магнитное поле с силовыми линиями' },
         { name: '🌊 Волна', description: 'Поперечная волна и её распространение' },
-        { name: '⚛️ Атом', description: 'Мод��ль атома с электронными орбитами' },
+        { name: '⚛️ Атом', description: 'Модель атома с электронными орбитами' },
       ]
     }
   }
@@ -83,7 +87,8 @@ function Gallery3D() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    renderer.physicallyCorrectLights = true
+    // Если в вашей версии three нет типизации для physicallyCorrectLights, используем any
+    ;(renderer as any).physicallyCorrectLights = true
     renderer.outputEncoding = THREE.sRGBEncoding
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0
@@ -318,7 +323,7 @@ function Gallery3D() {
     )
     cellGroup.add(cellBody)
 
-    // Внутренняя мембрана
+    // Внутренняя мем��рана
     const innerMembrane = new THREE.Mesh(
       new THREE.SphereGeometry(1.45, 64, 64),
       new THREE.MeshStandardMaterial({
@@ -1209,7 +1214,6 @@ function Gallery3D() {
           new THREE.MeshStandardMaterial({ color: orbit.color, roughness: 0.2 })
         )
         electron.position.set(Math.cos(angle) * orbit.radius, 0, Math.sin(angle) * orbit.radius)
-        // store orbit state
         ;(electron as any).userData = { orbit: orbit.radius, angle: angle, speed: 0.02 * (orbitIndex + 1) }
         atomGroup.add(electron)
       }
