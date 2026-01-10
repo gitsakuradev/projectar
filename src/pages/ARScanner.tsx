@@ -23,6 +23,8 @@ function ARScanner() {
   const { subject = 'geometry' } = useParams()
   const [isLoading, setIsLoading] = useState(true)
   const [markersFound, setMarkersFound] = useState<string[]>([])
+  const [cameraError, setCameraError] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(true)
 
   const subjectData: Record<string, any> = {
     geometry: { name: 'Геометрия', emoji: '📐', color: '#667eea' },
@@ -34,7 +36,17 @@ function ARScanner() {
   const currentSubject = subjectData[subject] || subjectData.geometry
 
   useEffect(() => {
-    setTimeout(() => setIsLoading(false), 1500)
+    // Проверка поддержки камеры
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError(true)
+      setIsLoading(false)
+      return
+    }
+
+    setTimeout(() => {
+      setIsLoading(false)
+      setTimeout(() => setShowInstructions(false), 5000)
+    }, 1500)
 
     const handleMarkerFound = (e: any) => {
       const markerName = e.target.getAttribute('preset') || 'custom'
@@ -64,6 +76,34 @@ function ARScanner() {
     }
   }, [isLoading])
 
+  if (cameraError) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        padding: '2rem',
+        textAlign: 'center'
+      }}>
+        <div>
+          <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>📱</h1>
+          <h2>Камера недоступна</h2>
+          <p style={{ marginTop: '1rem', opacity: 0.9 }}>
+            Ваш браузер не поддерживает доступ к камере.<br/>
+            Используйте современный браузер (Chrome, Safari, Firefox)
+          </p>
+          <Link to="/subjects" className="btn btn-primary" style={{ marginTop: '2rem' }}>
+            ← Назад к предметам
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       {isLoading && (
@@ -87,6 +127,38 @@ function ARScanner() {
           <div style={{fontSize: '1rem', marginTop: '1rem', opacity: 0.8}}>
             Разрешите доступ к камере
           </div>
+        </div>
+      )}
+
+      {showInstructions && !isLoading && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(0,0,0,0.9)',
+          color: 'white',
+          padding: '2rem',
+          borderRadius: '16px',
+          textAlign: 'center',
+          maxWidth: '90%',
+          zIndex: 150,
+          boxShadow: '0 10px 50px rgba(0,0,0,0.5)'
+        }}>
+          <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>💡 Как использовать:</h3>
+          <ol style={{ textAlign: 'left', marginTop: '1rem', lineHeight: '1.8' }}>
+            <li>Распечатайте маркеры из главного меню</li>
+            <li>Наведите камеру на маркер Hiro или Kanji</li>
+            <li>Держите камеру ровно</li>
+            <li>Появится 3D модель!</li>
+          </ol>
+          <button 
+            onClick={() => setShowInstructions(false)}
+            className="btn btn-primary"
+            style={{ marginTop: '1.5rem', background: currentSubject.color, border: 'none' }}
+          >
+            Понятно
+          </button>
         </div>
       )}
 
@@ -171,7 +243,6 @@ function ARScanner() {
                 material="color: #667eea; metalness: 0.3; roughness: 0.4;"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"
               />
-              {/* Рёбра куба */}
               <a-entity
                 position="0 0.5 0"
                 geometry="primitive: box; width: 1.02; height: 1.02; depth: 1.02"
@@ -213,20 +284,17 @@ function ARScanner() {
           <>
             {/* Маркер Hiro - Клетка */}
             <a-marker preset="hiro">
-              {/* Оболочка клетки */}
               <a-sphere
                 position="0 0.8 0"
                 radius="0.8"
                 material="color: #22c55e; transparent: true; opacity: 0.6;"
                 animation="property: scale; to: 1.1 1.1 1.1; loop: true; dur: 3000; dir: alternate; easing: easeInOutSine"
               />
-              {/* Ядро */}
               <a-sphere
                 position="0 0.8 0"
                 radius="0.3"
                 material="color: #16a34a; metalness: 0.5;"
               />
-              {/* Органеллы */}
               <a-sphere position="0.4 0.8 0.3" radius="0.1" material="color: #fbbf24;" />
               <a-sphere position="-0.4 0.8 -0.2" radius="0.1" material="color: #fbbf24;" />
               <a-sphere position="0.2 1.2 0" radius="0.1" material="color: #fbbf24;" />
@@ -244,7 +312,6 @@ function ARScanner() {
 
             {/* Маркер Kanji - ДНК */}
             <a-marker preset="kanji">
-              {/* Спираль ДНК (упрощённая) */}
               <a-entity position="0 0.8 0" rotation="0 0 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
                 <a-cylinder position="0.3 0" radius="0.08" height="2" material="color: #3b82f6;" rotation="0 0 30" />
                 <a-cylinder position="-0.3 0" radius="0.08" height="2" material="color: #ef4444;" rotation="0 0 -30" />
@@ -269,27 +336,23 @@ function ARScanner() {
           <>
             {/* Маркер Hiro - H2O */}
             <a-marker preset="hiro">
-              {/* Кислород */}
               <a-sphere
                 position="0 0.8 0"
                 radius="0.4"
                 material="color: #ef4444; metalness: 0.6;"
               />
-              {/* Водород 1 */}
               <a-sphere
                 position="0.6 1.1 0"
                 radius="0.25"
                 material="color: #f0f0f0; metalness: 0.5;"
                 animation="property: position; to: 0.7 1.2 0; loop: true; dur: 2000; dir: alternate; easing: easeInOutSine"
               />
-              {/* Водород 2 */}
               <a-sphere
                 position="-0.6 1.1 0"
                 radius="0.25"
                 material="color: #f0f0f0; metalness: 0.5;"
                 animation="property: position; to: -0.7 1.2 0; loop: true; dur: 2000; dir: alternate; easing: easeInOutSine"
               />
-              {/* Связи */}
               <a-cylinder position="0.3 0.95 0" radius="0.03" height="0.6" material="color: #999;" rotation="0 0 -40" />
               <a-cylinder position="-0.3 0.95 0" radius="0.03" height="0.6" material="color: #999;" rotation="0 0 40" />
               
@@ -307,13 +370,11 @@ function ARScanner() {
 
             {/* Маркер Kanji - CH4 */}
             <a-marker preset="kanji">
-              {/* Углерод */}
               <a-sphere
                 position="0 0.8 0"
                 radius="0.35"
                 material="color: #1f1f1f; metalness: 0.7;"
               />
-              {/* 4 атома водорода */}
               <a-sphere position="0 1.5 0" radius="0.22" material="color: #f0f0f0;" />
               <a-sphere position="0.7 0.5 0" radius="0.22" material="color: #f0f0f0;" />
               <a-sphere position="-0.4 0.5 0.6" radius="0.22" material="color: #f0f0f0;" />
@@ -337,7 +398,6 @@ function ARScanner() {
           <>
             {/* Маркер Hiro - Электрическая цепь */}
             <a-marker preset="hiro">
-              {/* Батарея */}
               <a-box
                 position="-0.8 0.8 0"
                 width="0.3"
@@ -348,7 +408,6 @@ function ARScanner() {
               <a-text value="+" position="-0.8 1.2 0.15" align="center" color="#ef4444" scale="0.5 0.5 0.5" />
               <a-text value="-" position="-0.8 0.4 0.15" align="center" color="#3b82f6" scale="0.5 0.5 0.5" />
               
-              {/* Лампочка */}
               <a-sphere
                 position="0.8 0.8 0"
                 radius="0.3"
@@ -356,13 +415,11 @@ function ARScanner() {
                 animation="property: components.material.material.emissiveIntensity; from: 0.3; to: 0.9; loop: true; dur: 1000; dir: alternate; easing: easeInOutSine"
               />
               
-              {/* Провода */}
               <a-box position="0 1.2 0" width="1.6" height="0.05" depth="0.05" material="color: #3b82f6;" />
               <a-box position="0 0.4 0" width="1.6" height="0.05" depth="0.05" material="color: #ef4444;" />
               <a-box position="-0.8 0.8 0" width="0.05" height="0.8" depth="0.05" material="color: #666;" />
               <a-box position="0.8 0.8 0" width="0.05" height="0.8" depth="0.05" material="color: #666;" />
               
-              {/* Электроны (анимация) */}
               <a-sphere
                 radius="0.08"
                 material="color: #fbbf24; emissive: #fbbf24;"
@@ -381,14 +438,12 @@ function ARScanner() {
 
             {/* Маркер Kanji - Атом */}
             <a-marker preset="kanji">
-              {/* Ядро */}
               <a-sphere
                 position="0 0.8 0"
                 radius="0.25"
                 material="color: #fbbf24; emissive: #fbbf24; emissiveIntensity: 0.4;"
               />
               
-              {/* Орбиты */}
               <a-torus
                 position="0 0.8 0"
                 radius="0.7"
@@ -404,7 +459,6 @@ function ARScanner() {
                 rotation="90 30 0"
               />
               
-              {/* Электроны */}
               <a-sphere
                 radius="0.1"
                 material="color: #3b82f6;"
