@@ -168,213 +168,942 @@ function Gallery3D() {
   }
 
   const createBiologyModels = () => {
-    // Клетка
+    // Модель 1: Детализированная клетка
     const cellGroup = new THREE.Group()
+    
+    // Клеточная мембрана (двойной слой)
     const cellBody = new THREE.Mesh(
-      new THREE.SphereGeometry(1.5, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0x22c55e, transparent: true, opacity: 0.7 })
+      new THREE.SphereGeometry(1.5, 64, 64),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x90ee90,
+        transparent: true,
+        opacity: 0.4,
+        roughness: 0.3,
+        metalness: 0.1
+      })
     )
     cellGroup.add(cellBody)
-    const nucleus = new THREE.Mesh(
-      new THREE.SphereGeometry(0.5, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0x16a34a })
+
+    // Внутренняя мембрана
+    const innerMembrane = new THREE.Mesh(
+      new THREE.SphereGeometry(1.45, 64, 64),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x7cfc00,
+        transparent: true,
+        opacity: 0.2,
+        roughness: 0.4
+      })
     )
+    cellGroup.add(innerMembrane)
+
+    // Ядро с двойной оболочкой
+    const nucleus = new THREE.Mesh(
+      new THREE.SphereGeometry(0.6, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x8b4789,
+        roughness: 0.2,
+        metalness: 0.3
+      })
+    )
+    nucleus.position.set(0, 0, 0)
     cellGroup.add(nucleus)
+
+    // Ядрышко
+    const nucleolus = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x4b0082,
+        roughness: 0.1,
+        metalness: 0.5
+      })
+    )
+    nucleolus.position.set(0.2, 0.1, 0)
+    cellGroup.add(nucleolus)
+
+    // Митохондрии (энергетические станции) - 8 штук
     for (let i = 0; i < 8; i++) {
-      const organelle = new THREE.Mesh(
-        new THREE.SphereGeometry(0.15, 16, 16),
-        new THREE.MeshStandardMaterial({ color: 0xfcd34d })
+      const angle = (i / 8) * Math.PI * 2
+      const radius = 1
+      const mitoGroup = new THREE.Group()
+      
+      const mitoBody = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.12, 0.35, 8, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xff6b6b,
+          roughness: 0.3,
+          metalness: 0.4
+        })
       )
-      organelle.position.set(Math.cos(i) * 1.2, Math.sin(i) * 0.8, Math.sin(i * 2) * 0.8)
-      cellGroup.add(organelle)
+      mitoGroup.add(mitoBody)
+
+      // Внутренние складки митохондрий
+      for (let j = 0; j < 4; j++) {
+        const fold = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.15, 0.08),
+          new THREE.MeshStandardMaterial({ 
+            color: 0xcc5555,
+            side: THREE.DoubleSide,
+            roughness: 0.4
+          })
+        )
+        fold.position.y = (j - 1.5) * 0.08
+        fold.rotation.y = Math.PI / 2
+        mitoGroup.add(fold)
+      }
+
+      mitoGroup.position.set(
+        Math.cos(angle) * radius,
+        Math.sin(angle * 1.5) * 0.4,
+        Math.sin(angle) * radius
+      )
+      mitoGroup.rotation.set(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI
+      )
+      cellGroup.add(mitoGroup)
     }
+
+    // Эндоплазматический ретикулум (складки)
+    for (let i = 0; i < 15; i++) {
+      const erSegment = new THREE.Mesh(
+        new THREE.TorusGeometry(0.15 + i * 0.05, 0.02, 8, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x87ceeb,
+          roughness: 0.5,
+          transparent: true,
+          opacity: 0.7
+        })
+      )
+      erSegment.position.set(
+        Math.cos(i * 0.4) * 0.8,
+        (i - 7) * 0.08,
+        Math.sin(i * 0.4) * 0.8
+      )
+      erSegment.rotation.x = Math.PI / 2 + i * 0.2
+      cellGroup.add(erSegment)
+    }
+
+    // Рибосомы (маленькие точки)
+    for (let i = 0; i < 40; i++) {
+      const ribosome = new THREE.Mesh(
+        new THREE.SphereGeometry(0.04, 8, 8),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xffd700,
+          roughness: 0.3,
+          metalness: 0.6
+        })
+      )
+      const angle = Math.random() * Math.PI * 2
+      const height = Math.random() * Math.PI
+      const radius = 1.1 + Math.random() * 0.2
+      ribosome.position.set(
+        Math.sin(height) * Math.cos(angle) * radius,
+        Math.cos(height) * radius,
+        Math.sin(height) * Math.sin(angle) * radius
+      )
+      cellGroup.add(ribosome)
+    }
+
+    // Аппарат Гольджи (стопка дисков)
+    const golgiGroup = new THREE.Group()
+    for (let i = 0; i < 6; i++) {
+      const disc = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.25, 0.03, 32),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xffa500,
+          roughness: 0.4,
+          metalness: 0.3
+        })
+      )
+      disc.position.y = i * 0.08 - 0.24
+      golgiGroup.add(disc)
+    }
+    golgiGroup.position.set(0.7, -0.3, 0.5)
+    cellGroup.add(golgiGroup)
+
     modelsRef.current.push(cellGroup)
 
-    // ДНК
+    // Модель 2: Детализированная ДНК
     const dnaGroup = new THREE.Group()
-    for (let i = 0; i < 50; i++) {
-      const t = i / 10
+    const segments = 80
+    const helixRadius = 0.6
+    const helixHeight = 5
+    
+    for (let i = 0; i < segments; i++) {
+      const t = (i / segments) * Math.PI * 4
+      const y = (i / segments) * helixHeight - helixHeight / 2
+
+      // Первая нить (синяя)
       const sphere1 = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 8, 8),
-        new THREE.MeshStandardMaterial({ color: 0x3b82f6 })
+        new THREE.SphereGeometry(0.12, 16, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x4169e1,
+          roughness: 0.2,
+          metalness: 0.6,
+          emissive: 0x4169e1,
+          emissiveIntensity: 0.2
+        })
       )
-      sphere1.position.set(Math.cos(t) * 0.5, t * 0.1 - 2.5, Math.sin(t) * 0.5)
+      sphere1.position.set(
+        Math.cos(t) * helixRadius,
+        y,
+        Math.sin(t) * helixRadius
+      )
       dnaGroup.add(sphere1)
 
+      // Вторая нить (красная)
       const sphere2 = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 8, 8),
-        new THREE.MeshStandardMaterial({ color: 0xef4444 })
+        new THREE.SphereGeometry(0.12, 16, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xff4444,
+          roughness: 0.2,
+          metalness: 0.6,
+          emissive: 0xff4444,
+          emissiveIntensity: 0.2
+        })
       )
-      sphere2.position.set(Math.cos(t + Math.PI) * 0.5, t * 0.1 - 2.5, Math.sin(t + Math.PI) * 0.5)
+      sphere2.position.set(
+        Math.cos(t + Math.PI) * helixRadius,
+        y,
+        Math.sin(t + Math.PI) * helixRadius
+      )
       dnaGroup.add(sphere2)
+
+      // Связи между нитями (водородные мостики)
+      if (i % 2 === 0) {
+        const bondGeometry = new THREE.CylinderGeometry(0.04, 0.04, helixRadius * 2, 8)
+        const bondMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0xcccccc,
+          roughness: 0.5,
+          transparent: true,
+          opacity: 0.8
+        })
+        const bond = new THREE.Mesh(bondGeometry, bondMaterial)
+        bond.position.set(0, y, 0)
+        bond.rotation.z = Math.PI / 2
+        bond.rotation.y = t
+        dnaGroup.add(bond)
+
+        // Азотистые основания (разноцветные)
+        const baseColors = [0xffff00, 0x00ff00, 0xff00ff, 0x00ffff]
+        const base1 = new THREE.Mesh(
+          new THREE.BoxGeometry(0.15, 0.08, 0.08),
+          new THREE.MeshStandardMaterial({ 
+            color: baseColors[i % 4],
+            roughness: 0.3,
+            metalness: 0.5
+          })
+        )
+        base1.position.set(
+          Math.cos(t) * helixRadius * 0.5,
+          y,
+          Math.sin(t) * helixRadius * 0.5
+        )
+        base1.rotation.y = t
+        dnaGroup.add(base1)
+      }
+
+      // Соединения в нити
+      if (i > 0) {
+        const prevT = ((i - 1) / segments) * Math.PI * 4
+        const prevY = ((i - 1) / segments) * helixHeight - helixHeight / 2
+        
+        const connector1Geometry = new THREE.CylinderGeometry(0.05, 0.05, 0.15, 8)
+        const connector1 = new THREE.Mesh(
+          connector1Geometry,
+          new THREE.MeshStandardMaterial({ color: 0x4169e1, roughness: 0.3 })
+        )
+        connector1.position.set(
+          (Math.cos(t) * helixRadius + Math.cos(prevT) * helixRadius) / 2,
+          (y + prevY) / 2,
+          (Math.sin(t) * helixRadius + Math.sin(prevT) * helixRadius) / 2
+        )
+        connector1.lookAt(new THREE.Vector3(
+          Math.cos(t) * helixRadius,
+          y,
+          Math.sin(t) * helixRadius
+        ))
+        dnaGroup.add(connector1)
+      }
     }
+
     modelsRef.current.push(dnaGroup)
 
-    // Сердце
+    // Модель 3: Анатомическое сердце
     const heartGroup = new THREE.Group()
-    const heartShape = new THREE.Shape()
-    heartShape.moveTo(0, 0)
-    heartShape.bezierCurveTo(0, -0.3, -0.6, -0.3, -0.6, 0)
-    heartShape.bezierCurveTo(-0.6, 0.3, 0, 0.6, 0, 1)
-    heartShape.bezierCurveTo(0, 0.6, 0.6, 0.3, 0.6, 0)
-    heartShape.bezierCurveTo(0.6, -0.3, 0, -0.3, 0, 0)
     
-    const extrudeSettings = { depth: 0.4, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1 }
-    const heartGeometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings)
-    const heart = new THREE.Mesh(
-      heartGeometry,
-      new THREE.MeshStandardMaterial({ color: 0xef4444 })
+    // Левый желудочек (большая нижняя камера)
+    const leftVentricle = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xdc143c,
+        roughness: 0.4,
+        metalness: 0.2
+      })
     )
-    heart.scale.set(2, 2, 2)
-    heartGroup.add(heart)
+    leftVentricle.scale.set(1, 1.3, 1)
+    leftVentricle.position.set(-0.3, -0.5, 0)
+    heartGroup.add(leftVentricle)
+
+    // Правый желудочек
+    const rightVentricle = new THREE.Mesh(
+      new THREE.SphereGeometry(0.6, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xb22222,
+        roughness: 0.4,
+        metalness: 0.2
+      })
+    )
+    rightVentricle.scale.set(1, 1.2, 1)
+    rightVentricle.position.set(0.3, -0.4, 0.1)
+    heartGroup.add(rightVentricle)
+
+    // Левое предсердие
+    const leftAtrium = new THREE.Mesh(
+      new THREE.SphereGeometry(0.45, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff6b6b,
+        roughness: 0.3,
+        metalness: 0.2
+      })
+    )
+    leftAtrium.position.set(-0.4, 0.5, -0.2)
+    heartGroup.add(leftAtrium)
+
+    // Правое предсердие
+    const rightAtrium = new THREE.Mesh(
+      new THREE.SphereGeometry(0.45, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xcd5c5c,
+        roughness: 0.3,
+        metalness: 0.2
+      })
+    )
+    rightAtrium.position.set(0.4, 0.5, 0)
+    heartGroup.add(rightAtrium)
+
+    // Аорта (главная артерия)
+    const aorta = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.15, 1, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff0000,
+        roughness: 0.3,
+        metalness: 0.3
+      })
+    )
+    aorta.position.set(-0.2, 1.2, -0.1)
+    aorta.rotation.z = 0.3
+    heartGroup.add(aorta)
+
+    // Лёгочная артерия
+    const pulmonaryArtery = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.12, 0.8, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x4169e1,
+        roughness: 0.3,
+        metalness: 0.3
+      })
+    )
+    pulmonaryArtery.position.set(0.3, 1.1, 0.1)
+    pulmonaryArtery.rotation.z = -0.2
+    heartGroup.add(pulmonaryArtery)
+
+    // Вены (полые вены)
+    const superiorVenaCava = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.15, 0.6, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x000080,
+        roughness: 0.3,
+        metalness: 0.3
+      })
+    )
+    superiorVenaCava.position.set(0.5, 1, -0.1)
+    heartGroup.add(superiorVenaCava)
+
+    // Коронарные артерии (на поверхности)
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2
+      const coronary = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 1.5, 8),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xff6347,
+          roughness: 0.2,
+          metalness: 0.4
+        })
+      )
+      coronary.position.set(
+        Math.cos(angle) * 0.3,
+        -0.2,
+        Math.sin(angle) * 0.3
+      )
+      coronary.rotation.z = angle
+      coronary.rotation.x = Math.PI / 4
+      heartGroup.add(coronary)
+    }
+
+    // Клапаны (визуализация)
+    const mitralValve = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.03, 16, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xffd700,
+        roughness: 0.2,
+        metalness: 0.6
+      })
+    )
+    mitralValve.position.set(-0.3, 0, 0)
+    mitralValve.rotation.x = Math.PI / 2
+    heartGroup.add(mitralValve)
+
+    heartGroup.scale.set(1.3, 1.3, 1.3)
     modelsRef.current.push(heartGroup)
 
-    // Нейрон
+    // Модель 4: Детальный нейрон
     const neuronGroup = new THREE.Group()
-    const body = new THREE.Mesh(
+    
+    // Тело клетки (сома)
+    const soma = new THREE.Mesh(
       new THREE.SphereGeometry(0.5, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0xa855f7 })
+      new THREE.MeshStandardMaterial({ 
+        color: 0xb19cd9,
+        roughness: 0.3,
+        metalness: 0.3
+      })
     )
-    neuronGroup.add(body)
-    
-    for (let i = 0; i < 6; i++) {
-      const angle = (i / 6) * Math.PI * 2
-      const dendrite = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05, 0.02, 1.5),
-        new THREE.MeshStandardMaterial({ color: 0xc084fc })
+    neuronGroup.add(soma)
+
+    // Ядро в соме
+    const neuronNucleus = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x6a0dad,
+        roughness: 0.2,
+        metalness: 0.4
+      })
+    )
+    neuronGroup.add(neuronNucleus)
+
+    // Дендриты (входные отростки) - разветвлённые
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2
+      const dendriteGroup = new THREE.Group()
+      
+      // Главный дендрит
+      const mainDendrite = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.05, 1.2, 8),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xdda0dd,
+          roughness: 0.4
+        })
       )
-      dendrite.position.set(Math.cos(angle) * 0.8, 0, Math.sin(angle) * 0.8)
-      dendrite.rotation.z = angle
-      neuronGroup.add(dendrite)
+      mainDendrite.position.y = 0.6
+      dendriteGroup.add(mainDendrite)
+
+      // Ветвления дендрита
+      for (let j = 0; j < 3; j++) {
+        const branch = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.04, 0.02, 0.6, 8),
+          new THREE.MeshStandardMaterial({ 
+            color: 0xe6c9e6,
+            roughness: 0.5
+          })
+        )
+        branch.position.set(
+          Math.cos(j) * 0.3,
+          0.8 + j * 0.15,
+          Math.sin(j) * 0.3
+        )
+        branch.rotation.z = (Math.random() - 0.5) * Math.PI / 3
+        dendriteGroup.add(branch)
+
+        // Мелкие шипики на ветвлениях
+        for (let k = 0; k < 5; k++) {
+          const spine = new THREE.Mesh(
+            new THREE.SphereGeometry(0.025, 8, 8),
+            new THREE.MeshStandardMaterial({ 
+              color: 0xff69b4,
+              roughness: 0.3,
+              metalness: 0.5
+            })
+          )
+          spine.position.set(
+            Math.cos(j) * 0.3 + (Math.random() - 0.5) * 0.1,
+            0.8 + j * 0.15 + k * 0.08,
+            Math.sin(j) * 0.3 + (Math.random() - 0.5) * 0.1
+          )
+          dendriteGroup.add(spine)
+        }
+      }
+
+      dendriteGroup.position.set(
+        Math.cos(angle) * 0.4,
+        0.1,
+        Math.sin(angle) * 0.4
+      )
+      dendriteGroup.rotation.z = -angle
+      dendriteGroup.rotation.x = Math.PI / 6
+      neuronGroup.add(dendriteGroup)
     }
-    
-    const axon = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.08, 3),
-      new THREE.MeshStandardMaterial({ color: 0x9333ea })
-    )
-    axon.position.y = -1.5
-    neuronGroup.add(axon)
+
+    // Аксон (длинный выходной отросток)
+    const axonSegments = 15
+    for (let i = 0; i < axonSegments; i++) {
+      const segment = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x9370db,
+          roughness: 0.3,
+          metalness: 0.2
+        })
+      )
+      segment.position.y = -0.7 - i * 0.38
+      segment.position.x = Math.sin(i * 0.3) * 0.1
+      segment.rotation.z = Math.sin(i * 0.3) * 0.1
+      neuronGroup.add(segment)
+
+      // Миелиновая оболочка (белая изоляция)
+      if (i % 3 !== 0) {
+        const myelin = new THREE.Mesh(
+          new THREE:CylinderGeometry(0.15, 0.15, 0.35, 12),
+          new THREE.MeshStandardMaterial({ 
+            color: 0xfffafa,
+            roughness: 0.2,
+            metalness: 0.4
+          })
+        )
+        myelin.position.copy(segment.position)
+        myelin.rotation.copy(segment.rotation)
+        neuronGroup.add(myelin)
+      }
+    }
+
+    // Терминальные окончания (синапсы)
+    const terminalY = -0.7 - axonSegments * 0.38
+    for (let i = 0; i < 5; i++) {
+      const terminal = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 16, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xff1493,
+          roughness: 0.2,
+          metalness: 0.5,
+          emissive: 0xff1493,
+          emissiveIntensity: 0.3
+        })
+      )
+      const angle = (i / 5) * Math.PI * 2
+      terminal.position.set(
+        Math.cos(angle) * 0.3,
+        terminalY - 0.2,
+        Math.sin(angle) * 0.3
+      )
+      neuronGroup.add(terminal)
+
+      // Нейромедиаторы (маленькие точки)
+      for (let j = 0; j < 8; j++) {
+        const neurotransmitter = new THREE.Mesh(
+          new THREE.SphereGeometry(0.03, 8, 8),
+          new THREE.MeshStandardMaterial({ 
+            color: 0xffff00,
+            emissive: 0xffff00,
+            emissiveIntensity: 0.5
+          })
+        )
+        neurotransmitter.position.set(
+          Math.cos(angle) * 0.3 + (Math.random() - 0.5) * 0.15,
+          terminalY - 0.25 + (Math.random() - 0.5) * 0.1,
+          Math.sin(angle) * 0.3 + (Math.random() - 0.5) * 0.15
+        )
+        neuronGroup.add(neurotransmitter)
+      }
+    }
+
+    neuronGroup.scale.set(0.7, 0.7, 0.7)
     modelsRef.current.push(neuronGroup)
   }
 
   const createChemistryModels = () => {
-    // H2O
+    // Модель 1: Детальная молекула H2O
     const h2oGroup = new THREE.Group()
+    
+    // Кислород (большой красный)
     const oxygen = new THREE.Mesh(
       new THREE.SphereGeometry(0.5, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0xef4444 })
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff0000,
+        roughness: 0.2,
+        metalness: 0.7,
+        emissive: 0xff0000,
+        emissiveIntensity: 0.1
+      })
     )
     h2oGroup.add(oxygen)
-    
+
+    // Электронное облако кислорода
+    const oxygenCloud = new THREE.Mesh(
+      new THREE.SphereGeometry(0.65, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff6666,
+        transparent: true,
+        opacity: 0.15,
+        roughness: 0.8
+      })
+    )
+    h2oGroup.add(oxygenCloud)
+
+    // Водород 1 (маленький белый)
     const hydrogen1 = new THREE.Mesh(
       new THREE.SphereGeometry(0.3, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0xf0f0f0 })
+      new THREE.MeshStandardMaterial({ 
+        color: 0xffffff,
+        roughness: 0.3,
+        metalness: 0.6
+      })
     )
-    hydrogen1.position.set(0.7, 0.5, 0)
+    hydrogen1.position.set(0.75, 0.55, 0)
     h2oGroup.add(hydrogen1)
-    
+
+    const h1Cloud = new THREE.Mesh(
+      new THREE.SphereGeometry(0.4, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xdddddd,
+        transparent: true,
+        opacity: 0.1
+      })
+    )
+    h1Cloud.position.copy(hydrogen1.position)
+    h2oGroup.add(h1Cloud)
+
+    // Водород 2
     const hydrogen2 = new THREE.Mesh(
       new THREE.SphereGeometry(0.3, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0xf0f0f0 })
+      new THREE.MeshStandardMaterial({ 
+        color: 0xffffff,
+        roughness: 0.3,
+        metalness: 0.6
+      })
     )
-    hydrogen2.position.set(-0.7, 0.5, 0)
+    hydrogen2.position.set(-0.75, 0.55, 0)
     h2oGroup.add(hydrogen2)
-    
+
+    const h2Cloud = new THREE.Mesh(
+      new THREE.SphereGeometry(0.4, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xdddddd,
+        transparent: true,
+        opacity: 0.1
+      })
+    )
+    h2Cloud.position.copy(hydrogen2.position)
+    h2oGroup.add(h2Cloud)
+
+    // Ковалентные связи (двойные цилиндры)
     const bond1 = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 0.9),
-      new THREE.MeshStandardMaterial({ color: 0xcccccc })
+      new THREE.CylinderGeometry(0.06, 0.06, 1, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xaaaaaa,
+        roughness: 0.4,
+        metalness: 0.6
+      })
     )
-    bond1.position.set(0.35, 0.25, 0)
-    bond1.rotation.z = -Math.PI / 6
+    bond1.position.set(0.38, 0.28, 0)
+    bond1.rotation.z = -Math.PI / 5
     h2oGroup.add(bond1)
-    
+
     const bond2 = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 0.9),
-      new THREE.MeshStandardMaterial({ color: 0xcccccc })
+      new THREE.CylinderGeometry(0.06, 0.06, 1, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xaaaaaa,
+        roughness: 0.4,
+        metalness: 0.6
+      })
     )
-    bond2.position.set(-0.35, 0.25, 0)
-    bond2.rotation.z = Math.PI / 6
+    bond2.position.set(-0.38, 0.28, 0)
+    bond2.rotation.z = Math.PI / 5
     h2oGroup.add(bond2)
-    
+
+    // Метки атомов
+    const createAtomLabel = (text: string, position: THREE.Vector3, color: number) => {
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      if (context) {
+        canvas.width = 128
+        canvas.height = 128
+        context.fillStyle = `#${color.toString(16).padStart(6, '0')}`
+        context.font = 'Bold 60px Arial'
+        context.textAlign = 'center'
+        context.textBaseline = 'middle'
+        context.fillText(text, 64, 64)
+      }
+      const texture = new THREE.CanvasTexture(canvas)
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture })
+      const sprite = new THREE.Sprite(spriteMaterial)
+      sprite.position.copy(position)
+      sprite.scale.set(0.5, 0.5, 1)
+      return sprite
+    }
+
+    h2oGroup.add(createAtomLabel('O', new THREE.Vector3(0, -0.7, 0), 0xff0000))
+    h2oGroup.add(createAtomLabel('H', new THREE.Vector3(0.75, 0.85, 0), 0xffffff))
+    h2oGroup.add(createAtomLabel('H', new THREE.Vector3(-0.75, 0.85, 0), 0xffffff))
+
+    // Диполь (стрелка)
+    const arrowHelper = new THREE.ArrowHelper(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, -0.3, 0),
+      0.8,
+      0x00ffff,
+      0.2,
+      0.15
+    )
+    h2oGroup.add(arrowHelper)
+
+    h2oGroup.scale.set(1.5, 1.5, 1.5)
     modelsRef.current.push(h2oGroup)
 
-    // CH4
+    // Модель 2: CH4 (метан) - тетраэдр
     const ch4Group = new THREE.Group()
+    
+    // Углерод (чёрный)
     const carbon = new THREE.Mesh(
-      new THREE.SphereGeometry(0.4, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0x1f1f1f })
+      new THREE.SphereGeometry(0.45, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x1a1a1a,
+        roughness: 0.2,
+        metalness: 0.8
+      })
     )
     ch4Group.add(carbon)
-    
-    const positions = [
-      [0, 1, 0],
-      [0.94, -0.33, 0],
-      [-0.47, -0.33, 0.82],
-      [-0.47, -0.33, -0.82]
+
+    const carbonCloud = new THREE.Mesh(
+      new THREE.SphereGeometry(0.6, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x444444,
+        transparent: true,
+        opacity: 0.1
+      })
+    )
+    ch4Group.add(carbonCloud)
+
+    // 4 атома водорода в тетраэдрической геометрии
+    const tetrahedralPositions = [
+      new THREE.Vector3(0, 1.2, 0),
+      new THREE.Vector3(1.13, -0.4, 0),
+      new THREE.Vector3(-0.565, -0.4, 0.98),
+      new THREE.Vector3(-0.565, -0.4, -0.98)
     ]
-    
-    positions.forEach(pos => {
+
+    tetrahedralPositions.forEach((pos, index) => {
+      // Водород
       const h = new THREE.Mesh(
-        new THREE.SphereGeometry(0.25, 32, 32),
-        new THREE.MeshStandardMaterial({ color: 0xf0f0f0 })
+        new THREE.SphereGeometry(0.28, 32, 32),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xf5f5f5,
+          roughness: 0.3,
+          metalness: 0.6
+        })
       )
-      h.position.set(pos[0], pos[1], pos[2])
+      h.position.copy(pos)
       ch4Group.add(h)
-      
-      const bond = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 1),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc })
+
+      // Облако
+      const hCloud = new THREE.Mesh(
+        new THREE.SphereGeometry(0.38, 32, 32),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xeeeeee,
+          transparent: true,
+          opacity: 0.1
+        })
       )
-      bond.position.set(pos[0] / 2, pos[1] / 2, pos[2] / 2)
-      bond.lookAt(new THREE.Vector3(pos[0], pos[1], pos[2]))
-      bond.rotateX(Math.PI / 2)
+      hCloud.position.copy(pos)
+      ch4Group.add(hCloud)
+
+      // Связь C-H
+      const bondLength = pos.length()
+      const bond = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.05, bondLength - 0.7, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x888888,
+          roughness: 0.4,
+          metalness: 0.6
+        })
+      )
+      bond.position.copy(pos.clone().multiplyScalar(0.5))
+      bond.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        pos.clone().normalize()
+      )
       ch4Group.add(bond)
+
+      // Метка H
+      ch4Group.add(createAtomLabel('H', pos.clone().add(pos.clone().normalize().multiplyScalar(0.3)), 0xffffff))
     })
-    
+
+    // Метка C
+    ch4Group.add(createAtomLabel('C', new THREE.Vector3(0, -0.6, 0), 0x1a1a1a))
+
+    ch4Group.scale.set(1.2, 1.2, 1.2)
     modelsRef.current.push(ch4Group)
 
-    // CO2
+    // Модель 3: CO2 (углекислый газ) - линейная
     const co2Group = new THREE.Group()
+    
+    // Углерод (центр)
     const carbonCO2 = new THREE.Mesh(
-      new THREE.SphereGeometry(0.4, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0x1f1f1f })
+      new THREE.SphereGeometry(0.45, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x2a2a2a,
+        roughness: 0.2,
+        metalness: 0.8
+      })
     )
     co2Group.add(carbonCO2)
-    
+
+    // Два атома кислорода
     const oxygen1 = new THREE.Mesh(
-      new THREE.SphereGeometry(0.35, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0xef4444 })
+      new THREE.SphereGeometry(0.42, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff3333,
+        roughness: 0.2,
+        metalness: 0.7,
+        emissive: 0xff0000,
+        emissiveIntensity: 0.1
+      })
     )
-    oxygen1.position.x = 1.2
+    oxygen1.position.x = 1.4
     co2Group.add(oxygen1)
-    
+
     const oxygen2 = new THREE.Mesh(
-      new THREE.SphereGeometry(0.35, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0xef4444 })
+      new THREE.SphereGeometry(0.42, 32, 32),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff3333,
+        roughness: 0.2,
+        metalness: 0.7,
+        emissive: 0xff0000,
+        emissiveIntensity: 0.1
+      })
     )
-    oxygen2.position.x = -1.2
+    oxygen2.position.x = -1.4
     co2Group.add(oxygen2)
-    
+
+    // Двойные связи C=O (две линии)
+    for (let i = 0; i < 2; i++) {
+      const offset = i === 0 ? 0.08 : -0.08
+      
+      const bond1 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.045, 0.95, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x999999,
+          roughness: 0.3,
+          metalness: 0.7
+        })
+      )
+      bond1.position.set(0.7, 0, offset)
+      bond1.rotation.z = Math.PI / 2
+      co2Group.add(bond1)
+
+      const bond2 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.045, 0.95, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x999999,
+          roughness: 0.3,
+          metalness: 0.7
+        })
+      )
+      bond2.position.set(-0.7, 0, offset)
+      bond2.rotation.z = Math.PI / 2
+      co2Group.add(bond2)
+    }
+
+    // Электронные облака
+    [oxygen1, oxygen2].forEach(o => {
+      const cloud = new THREE.Mesh(
+        new THREE.SphereGeometry(0.6, 32, 32),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xff6666,
+          transparent: true,
+          opacity: 0.1
+        })
+      )
+      cloud.position.copy(o.position)
+      co2Group.add(cloud)
+    })
+
+    // Метки
+    co2Group.add(createAtomLabel('C', new THREE.Vector3(0, -0.6, 0), 0x2a2a2a))
+    co2Group.add(createAtomLabel('O', new THREE.Vector3(1.4, -0.6, 0), 0xff0000))
+    co2Group.add(createAtomLabel('O', new THREE.Vector3(-1.4, -0.6, 0), 0xff0000))
+
+    co2Group.scale.set(1.3, 1.3, 1.3)
     modelsRef.current.push(co2Group)
 
-    // NaCl
+    // Модель 4: NaCl (кристаллическая решётка)
     const naclGroup = new THREE.Group()
-    for (let x = -1; x <= 1; x++) {
-      for (let y = -1; y <= 1; y++) {
-        for (let z = -1; z <= 1; z++) {
+    
+    const latticeSize = 3
+    const spacing = 0.7
+
+    for (let x = -latticeSize; x <= latticeSize; x++) {
+      for (let y = -latticeSize; y <= latticeSize; y++) {
+        for (let z = -latticeSize; z <= latticeSize; z++) {
           const isNa = (x + y + z) % 2 === 0
+          
+          // Атомы
           const atom = new THREE.Mesh(
-            new THREE.SphereGeometry(0.3, 32, 32),
+            new THREE.SphereGeometry(isNa ? 0.25 : 0.22, 32, 32),
             new THREE.MeshStandardMaterial({ 
-              color: isNa ? 0x9333ea : 0x22c55e,
-              metalness: 0.5
+              color: isNa ? 0x9370db : 0x32cd32,
+              roughness: 0.2,
+              metalness: isNa ? 0.8 : 0.6,
+              emissive: isNa ? 0x9370db : 0x32cd32,
+              emissiveIntensity: 0.2
             })
           )
-          atom.position.set(x * 0.8, y * 0.8, z * 0.8)
+          atom.position.set(x * spacing, y * spacing, z * spacing)
           naclGroup.add(atom)
+
+          // Ионное облако
+          const ionCloud = new THREE.Mesh(
+            new THREE.SphereGeometry(isNa ? 0.35 : 0.38, 32, 32),
+            new THREE.MeshStandardMaterial({ 
+              color: isNa ? 0xb19cd9 : 0x90ee90,
+              transparent: true,
+              opacity: 0.08
+            })
+          )
+          ionCloud.position.copy(atom.position)
+          naclGroup.add(ionCloud)
+
+          // Связи (только для видимых соединений)
+          if (x < latticeSize) {
+            const bond = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.03, 0.03, spacing, 8),
+              new THREE.MeshStandardMaterial({ 
+                color: 0x666666,
+                transparent: true,
+                opacity: 0.4
+              })
+            )
+            bond.position.set((x + 0.5) * spacing, y * spacing, z * spacing)
+            bond.rotation.z = Math.PI / 2
+            naclGroup.add(bond)
+          }
         }
       }
     }
+
+    // Рамка решётки
+    const edgesGeometry = new THREE.BoxGeometry(
+      latticeSize * 2 * spacing + 0.1,
+      latticeSize * 2 * spacing + 0.1,
+      latticeSize * 2 * spacing + 0.1
+    )
+    const edges = new THREE.EdgesGeometry(edgesGeometry)
+    const line = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.3, transparent: true })
+    )
+    naclGroup.add(line)
+
     modelsRef.current.push(naclGroup)
   }
 
