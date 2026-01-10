@@ -1,17 +1,32 @@
-// Добавьте этот файл в проект (src/types/three-examples.d.ts)
-// Он объявляет минимальные типы для OrbitControls из three/examples/jsm,
-// чтобы TypeScript не жаловался при импорте.
-import { Camera, Vector3 } from 'three';
+// Минимальная декларация для OrbitControls из three/examples/jsm/controls/OrbitControls
+// Помогает TypeScript при импорте примеров three.
+import { Camera, Event, MOUSE, TOUCH, Vector3 } from 'three';
 
 declare module 'three/examples/jsm/controls/OrbitControls' {
+  import { Camera, MOUSE, TOUCH, Vector3 } from 'three';
   export class OrbitControls {
-    constructor(camera: Camera, domElement?: HTMLElement);
-    update(): void;
-    dispose(): void;
-    enableDamping: boolean;
-    dampingFactor: number;
+    constructor(object: Camera, domElement?: HTMLElement);
+    enabled: boolean;
+    target: Vector3;
     minDistance: number;
     maxDistance: number;
-    target: Vector3;
+    minZoom: number;
+    maxZoom: number;
+    enableDamping: boolean;
+    dampingFactor: number;
+    enableZoom: boolean;
+    enableRotate: boolean;
+    enablePan: boolean;
+    zoomSpeed: number;
+    rotateSpeed: number;
+    panSpeed: number;
+    keys: string[];
+    mouseButtons: { LEFT: MOUSE; MIDDLE: MOUSE; RIGHT: MOUSE };
+    touches: { ONE: TOUCH; TWO: TOUCH };
+    update(): void;
+    dispose(): void;
+    addEventListener(type: string, listener: (event?: Event) => void): void;
+    removeEventListener(type: string, listener: (event?: Event) => void): void;
   }
+  export default OrbitControls;
 }
