@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Типы сообщений
 interface Message {
   id: string
-  role: 'user' | 'model'
+  role: 'user' | 'assistant'
   text: string
   timestamp: number
 }
@@ -19,34 +17,38 @@ const SUBJECTS = {
   general: { name: 'Общий', emoji: '🎓', color: '#6366f1', prompt: 'Ты эрудированный помощник в учебе. Отвечай на любые школьные вопросы.' }
 }
 
+// Доступные модели OpenRouter (бесплатные, работают без VPN)
+const MODELS = [
+  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small' },
+  { id: 'meta-llama/llama-3.2-3b-instruct:free', name: 'Llama 3.2 3B' },
+  { id: 'google/gemma-2-9b-it:free', name: 'Gemma 2 9B' }
+]
+
 type SubjectKey = keyof typeof SUBJECTS
 
 function AIChat() {
-  // Состояния
   const [activeSubject, setActiveSubject] = useState<SubjectKey>('general')
+  const [selectedModel, setSelectedModel] = useState(MODELS[0].id)
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', text: 'Привет! Я твой AI-репетитор. Выбери предмет сверху, и задай мне любой вопрос!', timestamp: Date.now() }
+    { id: '1', role: 'assistant', text: 'Привет! Я твой AI-репетитор на базе OpenRouter. Выбери предмет и модель сверху, затем задай любой вопрос! 🚀', timestamp: Date.now() }
   ])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [apiKey, setApiKey] = useState('')
+  const [showApiInput, setShowApiInput] = useState(true)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  
-  // Инициализация Gemini
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-  const genAI = new GoogleGenerativeAI(apiKey || '')
 
-  // Авто-скролл вниз
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Отправка сообщения
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
 
     if (!apiKey) {
-      alert('ОШИБКА: Не найден API ключ! Создайте файл .env с переменной VITE_GEMINI_API_KEY')
+      alert('⚠️ Введите API ключ OpenRouter!\n\n1. Зайдите на https://openrouter.ai/keys\n2. Создайте бесплатный аккаунт\n3. Скопируйте ключ и вставьте в поле выше')
       return
     }
 
@@ -57,56 +59,64 @@ function AIChat() {
       timestamp: Date.now()
     }
 
-    // Добавляем сообщение пользователя в UI
     setMessages(prev => [...prev, userMsg])
     setInputValue('')
     setIsLoading(true)
 
     try {
-      // ИСПРАВЛЕНИЕ: Используем 'gemini-pro' вместо 'gemini-1.5-flash', так как она стабильнее
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" })
-      
-      const systemPrompt = `
-        ${SUBJECTS[activeSubject].prompt}
-        Отвечай на русском языке. Используй эмодзи.
-        Форматируй ответ красиво (используй списки, жирный шрифт).
-        Отвечай кратко и понятно для школьника.
-      `
+      const systemPrompt = `${SUBJECTS[activeSubject].prompt}\n\nОтвечай на русском языке. Используй эмодзи для наглядности. Форматируй ответ красиво. Отвечай кратко и понятно для школьника.`
 
-      // Фильтруем историю (убираем приветствие модели, так как Google требует начинать с user)
-      const apiHistory = messages
-        .filter(m => m.id !== '1') 
-        .map(m => ({
-          role: m.role,
-          parts: [{ text: m.text }]
-        }))
+      // Формируем историю для API
+      const apiMessages = [
+        { role: 'system', content: systemPrompt },
+        ...messages
+          .filter(m => m.id !== '1')
+          .map(m => ({ role: m.role, content: m.text })),
+        { role: 'user', content: userMsg.text }
+      ]
 
-      const chat = model.startChat({
-        history: apiHistory
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://github.com/yourusername/ai-tutor',
+          'X-Title': 'AI School Tutor',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: apiMessages
+        })
       })
 
-      const result = await chat.sendMessage(systemPrompt + "\nВопрос студента: " + userMsg.text)
-      const response = result.response.text()
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error?.message || `HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+      const aiResponse = data.choices[0]?.message?.content || 'Ошибка: пустой ответ'
 
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: response,
+        role: 'assistant',
+        text: aiResponse,
         timestamp: Date.now()
       }
       setMessages(prev => [...prev, aiMsg])
     } catch (error: any) {
-      console.error("AI Error:", error)
+      console.error('OpenRouter Error:', error)
       
-      let errorText = 'Произошла ошибка связи.'
-      if (error.message && error.message.includes('404')) errorText = 'Модель временно недоступна (попробуйте VPN).'
-      if (error.message && error.message.includes('fetch')) errorText = 'Нет интернета или Google заблокирован (включи VPN).'
-      if (!apiKey) errorText = 'Отсутствует API ключ.'
+      let errorText = 'Произошла ошибка связи с OpenRouter.'
+      if (error.message.includes('401')) errorText = '❌ Неверный API ключ! Проверьте ключ на openrouter.ai/keys'
+      if (error.message.includes('402')) errorText = '💳 Недостаточно кредитов. Пополните баланс на openrouter.ai'
+      if (error.message.includes('429')) errorText = '⏳ Превышен лимит запросов. Подождите немного.'
+      if (error.message.includes('fetch')) errorText = '🌐 Проблема с интернетом. Проверьте соединение.'
 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
-        role: 'model',
-        text: `⚠️ ${errorText}\n(Техническая ошибка: ${error.message.slice(0, 50)}...)`,
+        role: 'assistant',
+        text: `⚠️ ${errorText}\n\n(Техническая ошибка: ${error.message})`,
         timestamp: Date.now()
       }])
     } finally {
@@ -129,15 +139,70 @@ function AIChat() {
       
       {/* Шапка */}
       <div style={{ 
-        padding: '16px', background: 'rgba(30, 41, 59, 0.8)', 
+        padding: '12px 16px', background: 'rgba(30, 41, 59, 0.95)', 
         backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)',
-        display: 'flex', alignItems: 'center', gap: '12px', zIndex: 10
+        zIndex: 10
       }}>
-        <Link to="/" style={{ 
-          textDecoration: 'none', fontSize: '1.2rem', padding: '8px', 
-          background: 'rgba(255,255,255,0.1)', borderRadius: '12px' 
-        }}>🏠</Link>
-        <div style={{ flex: 1, overflowX: 'auto', display: 'flex', gap: '8px', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+        {/* API Key Input */}
+        {showApiInput && (
+          <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Вставьте OpenRouter API ключ (https://openrouter.ai/keys)"
+              style={{
+                flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)',
+                padding: '10px 14px', borderRadius: '12px', color: 'white', fontSize: '0.9rem',
+                outline: 'none'
+              }}
+            />
+            <button
+              onClick={() => setShowApiInput(false)}
+              style={{
+                padding: '10px 16px', background: apiKey ? '#22c55e' : '#475569',
+                border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer',
+                fontSize: '0.9rem', fontWeight: 500
+              }}
+            >
+              {apiKey ? '✓ Сохранить' : 'Скрыть'}
+            </button>
+          </div>
+        )}
+
+        {!showApiInput && (
+          <button
+            onClick={() => setShowApiInput(true)}
+            style={{
+              marginBottom: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white',
+              cursor: 'pointer', fontSize: '0.85rem'
+            }}
+          >
+            🔑 Изменить API ключ
+          </button>
+        )}
+
+        {/* Выбор модели */}
+        <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+          {MODELS.map((model) => (
+            <button
+              key={model.id}
+              onClick={() => setSelectedModel(model.id)}
+              style={{
+                background: selectedModel === model.id ? '#6366f1' : 'rgba(255,255,255,0.05)',
+                border: selectedModel === model.id ? '1px solid white' : '1px solid transparent',
+                color: 'white', padding: '6px 12px', borderRadius: '16px',
+                whiteSpace: 'nowrap', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500
+              }}
+            >
+              🤖 {model.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Выбор предмета */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
           {(Object.keys(SUBJECTS) as SubjectKey[]).map((key) => (
             <button
               key={key}
@@ -146,8 +211,7 @@ function AIChat() {
                 background: activeSubject === key ? SUBJECTS[key].color : 'rgba(255,255,255,0.05)',
                 border: activeSubject === key ? '1px solid white' : '1px solid transparent',
                 color: 'white', padding: '8px 16px', borderRadius: '20px',
-                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
-                fontSize: '0.9rem', fontWeight: 500
+                whiteSpace: 'nowrap', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500
               }}
             >
               {SUBJECTS[key].emoji} {SUBJECTS[key].name}
@@ -175,10 +239,10 @@ function AIChat() {
               background: msg.role === 'user' ? '#3b82f6' : '#1e293b',
               padding: '12px 16px',
               borderRadius: msg.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-              lineHeight: '1.5',
+              lineHeight: '1.6',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               whiteSpace: 'pre-wrap',
-              border: msg.role === 'model' ? `1px solid ${SUBJECTS[activeSubject].color}40` : 'none'
+              border: msg.role === 'assistant' ? `1px solid ${SUBJECTS[activeSubject].color}40` : 'none'
             }}>
               {msg.text}
             </div>
