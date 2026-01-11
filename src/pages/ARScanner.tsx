@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-// Расширяем JSX для A-Frame элементов
+// Расширяем JSX для A-Frame
 declare global {
   namespace JSX {
     interface IntrinsicElements {
@@ -21,10 +21,11 @@ declare global {
 interface MarkerConfig {
   id: string | number
   type: 'hiro' | 'kanji' | 'pattern'
-  patternUrl?: string // Для кастомных маркеров
+  patternUrl?: string
   model: string
   color: string
   name: string
+  description: string
   isCustom?: boolean
 }
 
@@ -34,23 +35,27 @@ const ARScanner: React.FC = () => {
   const [error, setError] = useState('')
   const [showCustomModal, setShowCustomModal] = useState(false)
   
-  // Состояние для списка маркеров (стандартные + пользовательские)
-  const [activeMarkers, setActiveMarkers] = useState<MarkerConfig[]>([])
-
-  // Refs
-  const sceneRef = useRef<any>(null)
+  // Состояния для Premium фич
+  const [capturedImage, setCapturedImage] = useState<string | null>(null)
+  const [flash, setFlash] = useState(false)
+  const [activeMarkerId, setActiveMarkerId] = useState<string | number | null>(null)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  
+  // Custom marker state
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedCustomModel, setSelectedCustomModel] = useState('box')
 
-  // База данных предметов
+  const sceneRef = useRef<any>(null)
+
+  // База данных предметов с описаниями
   const subjectData: Record<string, any> = {
     geometry: {
       name: 'Геометрия',
       emoji: '📐',
       color: '#667eea',
       markers: [
-        { id: 'geo1', type: 'hiro', model: 'box', color: '#667eea', name: 'Куб' },
-        { id: 'geo2', type: 'kanji', model: 'cone', color: '#22c55e', name: 'Пирамида' },
+        { id: 'geo1', type: 'hiro', model: 'box', color: '#667eea', name: 'Куб', description: 'Правильный гексаэдр. Имеет 6 граней, 12 ребер и 8 вершин.' },
+        { id: 'geo2', type: 'kanji', model: 'cone', color: '#22c55e', name: 'Пирамида', description: 'Четырехугольная пирамида. Геометрическое тело с многоугольным основанием.' },
       ]
     },
     biology: {
@@ -58,8 +63,8 @@ const ARScanner: React.FC = () => {
       emoji: '🧬',
       color: '#22c55e',
       markers: [
-        { id: 'bio1', type: 'hiro', model: 'sphere', color: '#ff6b9d', name: 'Клетка' },
-        { id: 'bio2', type: 'kanji', model: 'torus', color: '#4ecdc4', name: 'ДНК' },
+        { id: 'bio1', type: 'hiro', model: 'sphere', color: '#ff6b9d', name: 'Клетка', description: 'Животная клетка. Элементарная единица строения и жизнедеятельности всех организмов.' },
+        { id: 'bio2', type: 'kanji', model: 'torus', color: '#4ecdc4', name: 'ДНК', description: 'Дезоксирибонуклеиновая кислота. Макромолекула, хранящая генетическую информацию.' },
       ]
     },
     chemistry: {
@@ -67,8 +72,8 @@ const ARScanner: React.FC = () => {
       emoji: '⚗️',
       color: '#f59e0b',
       markers: [
-        { id: 'chem1', type: 'hiro', model: 'sphere', color: '#00bfff', name: 'H₂O' },
-        { id: 'chem2', type: 'kanji', model: 'box', color: '#ff6347', name: 'CH₄' },
+        { id: 'chem1', type: 'hiro', model: 'sphere', color: '#00bfff', name: 'Молекула', description: 'Электронное облако атома. Демонстрирует вероятность нахождения электрона.' },
+        { id: 'chem2', type: 'kanji', model: 'box', color: '#ff6347', name: 'Кристалл', description: 'Кристаллическая решетка. Упорядоченное расположение атомов в веществе.' },
       ]
     },
     physics: {
@@ -76,20 +81,23 @@ const ARScanner: React.FC = () => {
       emoji: '⚡',
       color: '#ec4899',
       markers: [
-        { id: 'phys1', type: 'hiro', model: 'torus', color: '#ffd700', name: 'Цепь' },
-        { id: 'phys2', type: 'kanji', model: 'cylinder', color: '#ff1493', name: 'Магнит' },
+        { id: 'phys1', type: 'hiro', model: 'torus', color: '#ffd700', name: 'Поле', description: 'Магнитное поле тороидальной катушки с током.' },
+        { id: 'phys2', type: 'kanji', model: 'cylinder', color: '#ff1493', name: 'Сопротивление', description: 'Резистор. Элемент электрической цепи, оказывающий сопротивление току.' },
       ]
     }
   }
 
   const currentSubject = subjectData[subject] || subjectData.geometry
+  const [activeMarkers, setActiveMarkers] = useState<MarkerConfig[]>([])
 
-  // 1. Инициализация A-Frame компонентов для жестов (Вращение/Зум)
+  // === 1. Инициализация A-Frame компонентов (Жесты, События) ===
   useEffect(() => {
+    setActiveMarkers([...currentSubject.markers])
+
     if (typeof window !== 'undefined' && (window as any).AFRAME) {
       const AFRAME = (window as any).AFRAME
 
-      // Компонент детектора жестов (основа)
+      // Gesture Detector (Определяет касания: один палец или два)
       if (!AFRAME.components['gesture-detector']) {
         AFRAME.registerComponent('gesture-detector', {
           schema: { element: { default: '' } },
@@ -151,7 +159,7 @@ const ARScanner: React.FC = () => {
         })
       }
 
-      // Компонент обработчика жестов (применяет вращение/зум к модели)
+      // Gesture Handler (Применяет вращение и масштаб к модели)
       if (!AFRAME.components['gesture-handler']) {
         AFRAME.registerComponent('gesture-handler', {
           schema: { enabled: { default: true }, rotationFactor: { default: 5 }, minScale: { default: 0.3 }, maxScale: { default: 8 } },
@@ -187,78 +195,125 @@ const ARScanner: React.FC = () => {
           }
         })
       }
+
+      // Marker Events (Связывает AR события с React State)
+      if (!AFRAME.components['marker-events']) {
+        AFRAME.registerComponent('marker-events', {
+          init: function() {
+            this.el.addEventListener('markerFound', () => {
+              const id = this.el.getAttribute('id')
+              window.dispatchEvent(new CustomEvent('ar-marker-found', { detail: { id } }))
+            })
+            this.el.addEventListener('markerLost', () => {
+              window.dispatchEvent(new CustomEvent('ar-marker-lost'))
+            })
+          }
+        })
+      }
     }
-  }, [])
 
-  // 2. Инициализация камеры и списка маркеров
-  useEffect(() => {
-    setActiveMarkers([...currentSubject.markers])
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setError('Ваш браузер не поддерживает доступ к камере')
-      return
+    // Слушатели событий
+    const onMarkerFound = (e: any) => {
+      const id = e.detail.id
+      setActiveMarkerId(id)
+      // Haptic Feedback (Вибрация)
+      if (navigator.vibrate) navigator.vibrate(50)
     }
 
+    const onMarkerLost = () => {
+      setActiveMarkerId(null)
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+    }
+
+    window.addEventListener('ar-marker-found', onMarkerFound)
+    window.addEventListener('ar-marker-lost', onMarkerLost)
+
+    // Запуск камеры
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(() => {
-        setArReady(true)
-        setError('')
-      })
+      .then(() => { setArReady(true); setError('') })
       .catch((err) => {
         console.error('Camera error:', err)
-        setError('Не удалось получить доступ к камере. Убедитесь, что сайт открыт через HTTPS (или localhost).')
+        setError('Не удалось получить доступ к камере. Убедитесь, что используете HTTPS.')
       })
 
     return () => {
-      // Очистка при выходе: удаляем видео-тег, созданный AR.js
+      window.removeEventListener('ar-marker-found', onMarkerFound)
+      window.removeEventListener('ar-marker-lost', onMarkerLost)
+      window.speechSynthesis.cancel()
+      
       const arVideo = document.getElementById('arjs-video')
       if (arVideo) arVideo.remove()
-      
-      // Сброс стилей body
       document.body.style.overflow = ''
       document.body.style.width = ''
       document.body.style.height = ''
     }
   }, [subject])
 
-  // 3. Логика добавления кастомного маркера
+  // === Функционал ===
+
+  // 1. Text-to-Speech
+  const toggleSpeech = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+    } else {
+      const marker = activeMarkers.find(m => m.id === activeMarkerId)
+      if (marker) {
+        const text = `${marker.name}. ${marker.description}`
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = 'ru-RU'
+        utterance.onend = () => setIsSpeaking(false)
+        window.speechSynthesis.speak(utterance)
+        setIsSpeaking(true)
+      }
+    }
+  }
+
+  // 2. Скриншот
+  const takeScreenshot = () => {
+    const sceneEl = sceneRef.current
+    if (sceneEl) {
+      setFlash(true)
+      setTimeout(() => setFlash(false), 300)
+      
+      // Требует preserveDrawingBuffer: true в настройках рендерера
+      const canvas = sceneEl.components.screenshot.getCanvas('perspective')
+      setCapturedImage(canvas.toDataURL('image/png'))
+    }
+  }
+
+  // 3. Загрузка своего маркера
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
-
-    // Проверяем расширение (должно быть .patt)
-    if (!file.name.endsWith('.patt')) {
-      alert('Пожалуйста, выберите файл с расширением .patt')
+    if (!file || !file.name.endsWith('.patt')) {
+      alert('Пожалуйста, выберите файл .patt')
       return
     }
 
-    // Создаем URL для файла
-    const fileUrl = URL.createObjectURL(file)
-    
     const newMarker: MarkerConfig = {
       id: `custom-${Date.now()}`,
       type: 'pattern',
-      patternUrl: fileUrl,
+      patternUrl: URL.createObjectURL(file),
       model: selectedCustomModel,
-      color: '#ffffff', // Белый цвет для кастомных по умолчанию, чтобы не конфликтовал
+      color: '#ffffff',
       name: `Мой ${selectedCustomModel}`,
+      description: 'Пользовательская модель',
       isCustom: true
     }
-
     setActiveMarkers(prev => [...prev, newMarker])
     setShowCustomModal(false)
   }
 
+  // Рендер 3D моделей
   const renderModel = (markerData: MarkerConfig) => {
     const { model, color } = markerData
-    // gesture-handler подключает возможность крутить модель
     const commonProps = {
       position: "0 0.5 0",
       color: color,
-      "gesture-handler": "minScale: 0.2; maxScale: 5",
+      "gesture-handler": "minScale: 0.2; maxScale: 5", // Подключаем жесты к модели
       shadow: "cast: true; receive: false",
-      // Красивая анимация появления
-      animation: "property: scale; from: 0 0 0; to: 1 1 1; dur: 500; easing: easeOutElastic"
+      animation: "property: scale; from: 0 0 0; to: 1 1 1; dur: 800; easing: easeOutElastic"
     }
 
     switch (model) {
@@ -272,17 +327,14 @@ const ARScanner: React.FC = () => {
     }
   }
 
+  const activeMarkerData = activeMarkers.find(m => m.id === activeMarkerId)
+
   if (error) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#05050a',
-        padding: '2rem',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white'
-      }}>
-        <h2 style={{ color: '#ff6b6b' }}>Ошибка доступа к камере</h2>
+      <div style={{ minHeight: '100vh', background: '#05050a', padding: '2rem', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <h2>🚫 Ошибка камеры</h2>
         <p>{error}</p>
-        <Link to="/subjects" className="btn btn-primary" style={{ marginTop: '1rem' }}>Вернуться назад</Link>
+        <Link to="/subjects" className="btn btn-primary" style={{marginTop: 20}}>Вернуться назад</Link>
       </div>
     )
   }
@@ -290,25 +342,27 @@ const ARScanner: React.FC = () => {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden', background: 'black' }}>
       
-      {/* AR Scene с улучшенными настройками */}
+      {flash && <div className="flash-overlay" />}
+
+      {/* AR SCENE */}
       {arReady && (
         <a-scene
           ref={sceneRef}
           embedded
           arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; maxDetectionRate: 60;"
-          renderer="logarithmicDepthBuffer: true; precision: medium; antialias: true; alpha: true;"
+          // Важно: preserveDrawingBuffer нужен для скриншотов
+          renderer="logarithmicDepthBuffer: true; precision: medium; antialias: true; alpha: true; preserveDrawingBuffer: true;"
           vr-mode-ui="enabled: false"
           gesture-detector
           style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
         >
-          {/* Свет */}
           <a-entity light="type: ambient; color: #FFF; intensity: 0.7" />
           <a-entity light="type: directional; color: #FFF; intensity: 1" position="-1 1 0" />
 
-          {/* Маркеры */}
           {activeMarkers.map((marker) => (
             <a-marker
               key={marker.id}
+              id={marker.id}
               type={marker.type}
               preset={marker.type !== 'pattern' ? marker.type : undefined}
               url={marker.type === 'pattern' ? marker.patternUrl : undefined}
@@ -317,149 +371,148 @@ const ARScanner: React.FC = () => {
               smoothCount="10"
               smoothTolerance="0.01"
               smoothThreshold="5"
+              marker-events
             >
               {renderModel(marker)}
             </a-marker>
           ))}
-
           <a-entity camera />
         </a-scene>
       )}
 
       {/* Верхняя панель */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0,
-        padding: '1rem',
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-        zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-        pointerEvents: 'none'
+        position: 'absolute', top: 0, left: 0, right: 0, padding: '16px',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
+        display: 'flex', justifyContent: 'space-between', zIndex: 20, pointerEvents: 'none'
       }}>
-        <Link to="/subjects" className="btn" style={{
-          pointerEvents: 'auto', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(5px)',
-          padding: '0.5rem 1rem', fontSize: '0.9rem', color: 'white'
-        }}>
+        <Link to="/subjects" style={{ pointerEvents: 'auto', background: 'rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: '20px', color: 'white', textDecoration: 'none', backdropFilter: 'blur(5px)', fontSize: '0.9rem' }}>
           ← Выход
         </Link>
-        
-        <div style={{ textAlign: 'right', pointerEvents: 'auto' }}>
-           <div style={{
-             background: 'rgba(0,0,0,0.6)', padding: '0.5rem 1rem', borderRadius: '12px',
-             display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'white', backdropFilter: 'blur(5px)'
-           }}>
-             <span>{currentSubject.emoji}</span>
-             <span style={{ fontWeight: 600 }}>{currentSubject.name}</span>
-           </div>
-           
-           <button 
-            onClick={() => setShowCustomModal(true)}
-            style={{
-              display: 'block', marginTop: '10px', marginLeft: 'auto',
-              background: '#667eea', color: 'white', border: 'none',
-              padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem',
-              cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
-            }}
-           >
-             ➕ Свой маркер
-           </button>
-        </div>
+        <button onClick={() => setShowCustomModal(true)} style={{ pointerEvents: 'auto', background: '#667eea', border: 'none', padding: '8px 16px', borderRadius: '20px', color: 'white', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+          ➕ Свой маркер
+        </button>
       </div>
 
-      {/* Нижняя панель с подсказкой */}
+      {/* Кнопка скриншота (справа) */}
       <div style={{
-        position: 'absolute', bottom: 20, left: 0, right: 0,
-        textAlign: 'center', pointerEvents: 'none', zIndex: 10
+        position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
+        display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 20
       }}>
-        <div style={{
-          display: 'inline-block', background: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(10px)', padding: '10px 20px', borderRadius: '30px',
-          color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', border: '1px solid rgba(255,255,255,0.2)'
+        <button onClick={takeScreenshot} style={{
+          width: '50px', height: '50px', borderRadius: '50%', border: 'none',
+          background: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', cursor: 'pointer'
         }}>
-          👆 Можно вращать и увеличивать двумя пальцами
-        </div>
+          📸
+        </button>
       </div>
 
-      {/* Модальное окно добавления маркера */}
-      {showCustomModal && (
+      {/* Умная карточка информации (снизу) */}
+      <div style={{
+        position: 'absolute', bottom: '24px', left: '16px', right: '16px',
+        background: activeMarkerId ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '20px', padding: '16px',
+        transform: activeMarkerId ? 'translateY(0)' : 'translateY(20px)',
+        opacity: activeMarkerId ? 1 : 0.8,
+        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        zIndex: 20,
+        boxShadow: activeMarkerId ? '0 10px 30px rgba(0,0,0,0.2)' : 'none'
+      }}>
+        {activeMarkerId && activeMarkerData ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h3 style={{ margin: '0 0 4px 0', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {activeMarkerData.name}
+                <span style={{ fontSize: '11px', background: activeMarkerData.color, color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>AR</span>
+              </h3>
+              <p style={{ margin: 0, fontSize: '13px', color: '#666', maxWidth: '240px', lineHeight: '1.4' }}>
+                {activeMarkerData.description}
+              </p>
+            </div>
+            <button 
+              onClick={toggleSpeech}
+              style={{
+                width: '44px', height: '44px', borderRadius: '50%',
+                background: isSpeaking ? '#ff4757' : '#667eea',
+                border: 'none', color: 'white', fontSize: '20px',
+                cursor: 'pointer', flexShrink: 0, marginLeft: '10px',
+                transition: 'background 0.3s',
+                boxShadow: '0 4px 10px rgba(102, 126, 234, 0.3)'
+              }}
+            >
+              {isSpeaking ? '🔇' : '🔊'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ color: 'white', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+            <div className="spinner" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            <span style={{ fontSize: '0.9rem' }}>Поиск маркера...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Модальное окно скриншота */}
+      {capturedImage && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', zIndex: 100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)',
+          zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'
         }}>
-          <div style={{
-            background: '#1a1a2e', padding: '2rem', borderRadius: '20px',
-            width: '100%', maxWidth: '400px', color: 'white', border: '1px solid #333'
-          }}>
+          <h3 style={{ color: 'white', marginBottom: '10px' }}>Снимок готов!</h3>
+          <img src={capturedImage} alt="AR Capture" style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: '12px', border: '2px solid white', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }} />
+          <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '20px', marginTop: '10px' }}>Нажмите и удерживайте фото, чтобы сохранить</p>
+          <button onClick={() => setCapturedImage(null)} style={{ padding: '12px 24px', background: 'white', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
+            Закрыть
+          </button>
+        </div>
+      )}
+
+      {/* Модальное окно загрузки маркера */}
+      {showCustomModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#1a1a2e', padding: '24px', borderRadius: '24px', width: '100%', maxWidth: '400px', color: 'white', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
             <h3 style={{ marginTop: 0 }}>Добавить свой маркер</h3>
             <p style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '1.5rem' }}>
-              Загрузите файл <code>.patt</code> и выберите 3D модель для него.
+              Загрузите файл <code>.patt</code> и выберите 3D модель.
             </p>
 
             <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>1. Файл маркера (.patt)</label>
-              <input 
-                ref={fileInputRef}
-                type="file" 
-                accept=".patt"
-                onChange={handleFileUpload}
-                style={{ width: '100%', padding: '0.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
-              />
+              <input ref={fileInputRef} type="file" accept=".patt" onChange={handleFileUpload} style={{ display: 'none' }} />
+              <button onClick={() => fileInputRef.current?.click()} style={{ width: '100%', padding: '14px', background: '#22c55e', border: 'none', color: 'white', borderRadius: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                📁 Выбрать .patt файл
+              </button>
             </div>
 
             <div style={{ marginBottom: '2rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>2. Выберите модель</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              <label style={{ display: 'block', marginBottom: '0.8rem', fontSize: '0.9rem', color: '#ccc' }}>Выберите модель:</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                 {['box', 'sphere', 'cylinder', 'cone', 'torus', 'dodecahedron'].map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setSelectedCustomModel(m)}
-                    style={{
-                      background: selectedCustomModel === m ? '#667eea' : 'rgba(255,255,255,0.1)',
-                      border: selectedCustomModel === m ? '2px solid white' : 'none',
-                      padding: '10px', borderRadius: '8px', color: 'white', cursor: 'pointer'
-                    }}
-                  >
+                  <button key={m} onClick={() => setSelectedCustomModel(m)} style={{ 
+                    background: selectedCustomModel === m ? '#667eea' : 'rgba(255,255,255,0.1)', 
+                    border: selectedCustomModel === m ? '2px solid white' : 'none', 
+                    color: 'white', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem' 
+                  }}>
                     {m}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button 
-                onClick={() => setShowCustomModal(false)}
-                style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '10px', cursor: 'pointer' }}
-              >
-                Отмена
-              </button>
-              <button 
-                onClick={() => fileInputRef.current?.click()} // Триггерим инпут программно при клике, если файл не выбран, иначе логика в onChange
-                style={{ flex: 1, padding: '12px', background: '#22c55e', border: 'none', color: 'white', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Загрузить
-              </button>
-            </div>
+            <button onClick={() => setShowCustomModal(false)} style={{ width: '100%', padding: '14px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '12px', cursor: 'pointer' }}>
+              Отмена
+            </button>
             
             <div style={{ marginTop: '1rem', fontSize: '0.8rem', textAlign: 'center' }}>
-              <a href="https://jeromeetienne.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank" style={{ color: '#667eea' }}>
-                🔗 Создать .patt файл онлайн
-              </a>
+               <a href="https://jeromeetienne.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank" style={{ color: '#667eea' }}>
+                🔗 Генератор маркеров
+               </a>
             </div>
           </div>
         </div>
       )}
 
-      {/* Loading state */}
-      {!arReady && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          background: '#05050a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white'
-        }}>
-          <div className="loading-spinner" style={{ 
-            width: '50px', height: '50px', border: '4px solid #333', borderTop: '4px solid #667eea', borderRadius: '50%', marginBottom: '1rem'
-          }} />
-          <div>Запуск камеры...</div>
-        </div>
-      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
