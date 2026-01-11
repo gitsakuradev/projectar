@@ -6,15 +6,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 function Gallery3D() {
   const { subject = 'geometry' } = useParams()
   const canvasRef = useRef<HTMLDivElement>(null)
+  
+  // Состояния
   const [currentModel, setCurrentModel] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [autoRotate, setAutoRotate] = useState(true) // Новое: авто-вращение
+  const [lowQuality, setLowQuality] = useState(false) // Новое: ручное переключение качества
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Refs для Three.js
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
   const modelsRef = useRef<THREE.Object3D[]>([])
-  const [lowQuality, setLowQuality] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
 
   const subjectData: Record<string, any> = {
     geometry: {
@@ -66,10 +71,12 @@ function Gallery3D() {
   const currentSubject = subjectData[subject] || subjectData.geometry
 
   useEffect(() => {
+    // 1. Определение устройства
     const ua = navigator.userAgent
     const mobile = /Mobi|Android|iPhone|iPad|iPod/.test(ua) || window.innerWidth < 768
     setIsMobile(mobile)
     
+    // Автоматическое снижение качества на слабых сетях или мобилках
     const connection = (navigator as any).connection
     const saveData = connection?.saveData || connection?.effectiveType?.includes('2g')
     const preferLow = mobile || saveData
@@ -77,27 +84,22 @@ function Gallery3D() {
 
     if (!canvasRef.current) return
 
-    // Адаптивные параметры детализации
+    // Адаптивные параметры детализации (чтобы не лагало)
     const DETAIL = {
-      sphereSeg: preferLow ? 12 : mobile ? 24 : 64,
-      cylRadial: preferLow ? 8 : mobile ? 16 : 64,
-      dnaSeg: preferLow ? 30 : mobile ? 50 : 80,
-      ribosomes: preferLow ? 8 : mobile ? 20 : 40,
-      mitochondria: preferLow ? 3 : mobile ? 5 : 8,
-      erSegments: preferLow ? 6 : mobile ? 10 : 15,
-      neuronSpines: preferLow ? 1 : mobile ? 3 : 5,
-      neurotransmitters: preferLow ? 3 : mobile ? 6 : 8,
-      axonSegments: preferLow ? 6 : mobile ? 10 : 15,
+      sphereSeg: preferLow ? 16 : mobile ? 32 : 64,
+      cylRadial: preferLow ? 12 : mobile ? 24 : 64,
+      dnaSeg: preferLow ? 40 : mobile ? 60 : 100,
+      ribosomes: preferLow ? 10 : mobile ? 20 : 50,
       naclLattice: preferLow ? 1 : 2
     }
 
-    // Scene
+    // 2. Setup Scene
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x0a0a1a)
-    scene.fog = new THREE.FogExp2(0x0a0a1a, preferLow ? 0.05 : 0.02)
+    scene.fog = new THREE.FogExp2(0x0a0a1a, preferLow ? 0.04 : 0.02)
     sceneRef.current = scene
 
-    // Camera
+    // 3. Setup Camera
     const camera = new THREE.PerspectiveCamera(
       mobile ? 60 : 50,
       window.innerWidth / window.innerHeight,
@@ -107,11 +109,11 @@ function Gallery3D() {
     camera.position.set(0, mobile ? 1.5 : 1.2, mobile ? 4 : 6)
     cameraRef.current = camera
 
-    // Renderer с оптимизацией для мобильных
+    // 4. Setup Renderer
     const renderer = new THREE.WebGLRenderer({
-      antialias: !preferLow && !mobile,
+      antialias: !preferLow && !mobile, // Выключаем сглаживание на мобилках для FPS
       alpha: true,
-      powerPreference: mobile ? 'low-power' : 'high-performance',
+      powerPreference: 'high-performance',
       stencil: false,
       depth: true
     })
@@ -119,8 +121,10 @@ function Gallery3D() {
     const maxDPR = preferLow ? 1 : mobile ? 1.5 : Math.min(window.devicePixelRatio, 2)
     renderer.setPixelRatio(maxDPR)
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.shadowMap.enabled = !preferLow && !mobile
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.shadowMap.enabled = !preferLow && !mobile // Тени только на ПК
+    if (!preferLow && !mobile) {
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    }
     renderer.outputEncoding = THREE.sRGBEncoding
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0
@@ -128,78 +132,52 @@ function Gallery3D() {
     canvasRef.current.appendChild(renderer.domElement)
     rendererRef.current = renderer
 
-    // Controls с улучшенной настройкой для тач-устройств
+    // 5. Setup Controls
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
-    controls.dampingFactor = mobile ? 0.15 : 0.08
+    controls.dampingFactor = mobile ? 0.1 : 0.05
     controls.minDistance = 2
     controls.maxDistance = mobile ? 10 : 20
     controls.enablePan = !mobile
-    controls.enableZoom = true
-    controls.zoomSpeed = mobile ? 0.8 : 1.0
-    controls.rotateSpeed = mobile ? 0.6 : 1.0
-    controls.target.set(0, 0.6, 0)
-    controls.maxPolarAngle = Math.PI * 0.9
-    controls.minPolarAngle = Math.PI * 0.1
-    
-    // Улучшенная поддержка тач-жестов
-    if (mobile) {
-      controls.touches = {
-        ONE: THREE.TOUCH.ROTATE,
-        TWO: THREE.TOUCH.DOLLY_PAN
-      }
-    }
-    
+    controls.autoRotate = autoRotate // Используем стейт
+    controls.autoRotateSpeed = 2.0
     controlsRef.current = controls
 
-    // Lighting с адаптацией
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x080820, mobile ? 0.5 : 0.6)
+    // 6. Setup Lighting
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x080820, mobile ? 0.6 : 0.6)
     scene.add(hemi)
 
-    const dir = new THREE.DirectionalLight(0xffffff, mobile ? 0.7 : 1.0)
+    const dir = new THREE.DirectionalLight(0xffffff, mobile ? 0.8 : 1.0)
     dir.position.set(5, 8, 3)
     dir.castShadow = !preferLow && !mobile
     
     if (!preferLow && !mobile) {
-      dir.shadow.camera.left = -6
-      dir.shadow.camera.right = 6
-      dir.shadow.camera.top = 6
-      dir.shadow.camera.bottom = -6
       dir.shadow.mapSize.width = 1024
       dir.shadow.mapSize.height = 1024
-      dir.shadow.radius = 3
       dir.shadow.bias = -0.0001
     }
     scene.add(dir)
 
-    const p1 = new THREE.PointLight(0xff6b9d, mobile ? 0.3 : 0.6, 50)
+    const p1 = new THREE.PointLight(0xff6b9d, mobile ? 0.4 : 0.6, 50)
     p1.position.set(4, 4, 5)
     scene.add(p1)
 
-    const p2 = new THREE.PointLight(0x4ecdc4, mobile ? 0.3 : 0.6, 50)
+    const p2 = new THREE.PointLight(0x4ecdc4, mobile ? 0.4 : 0.6, 50)
     p2.position.set(-4, 2, 5)
     scene.add(p2)
 
-    // Ground + Grid
-    if (!mobile) {
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(100, 100),
-        new THREE.ShadowMaterial({ opacity: preferLow ? 0.04 : 0.14 })
-      )
-      ground.rotation.x = -Math.PI / 2
-      ground.position.y = -2
-      ground.receiveShadow = !preferLow
-      scene.add(ground)
-
-      const grid = new THREE.GridHelper(10, 40, 0x222233, 0x0f1724)
-      grid.position.y = -1.99
-      if (grid.material) {
-        ;(grid.material as any).opacity = preferLow ? 0.04 : 0.12
-        ;(grid.material as any).transparent = true
-      }
-      scene.add(grid)
+    // Ground & Grid (только для ПК для красоты)
+    if (!mobile && !preferLow) {
+        const grid = new THREE.GridHelper(20, 40, 0x222233, 0x0f1724)
+        grid.position.y = -2
+        if (grid.material instanceof THREE.Material) {
+            grid.material.transparent = true
+            grid.material.opacity = 0.2
+        }
+        scene.add(grid)
     }
 
+    // === ГЕНЕРАЦИЯ МОДЕЛЕЙ (Тот самый большой блок) ===
     modelsRef.current = []
 
     const enableShadowsRec = (obj: THREE.Object3D) => {
@@ -208,615 +186,389 @@ function Gallery3D() {
           const m = child as THREE.Mesh
           m.castShadow = !preferLow && !mobile
           m.receiveShadow = !preferLow && !mobile
-          const mat = m.material as any
-          if (mat?.isMeshStandardMaterial || mat?.isMeshPhysicalMaterial) {
-            mat.roughness = Math.max(0, (mat.roughness ?? 0.4) - (mobile ? 0.1 : 0.05))
-            mat.metalness = Math.min(1, (mat.metalness ?? 0) + (mobile ? 0.05 : 0.03))
-            mat.needsUpdate = true
-          }
         }
       })
     }
 
-    // Создание моделей с оптимизацией
+    // --- GEOMETRY ---
     const createGeometryModels = () => {
+      // Box
       const boxGeo = new THREE.BoxGeometry(2, 2, 2)
-      const boxMat = new THREE.MeshPhysicalMaterial({
-        color: 0x667eea,
-        metalness: 0.2,
-        roughness: 0.35,
-        clearcoat: mobile ? 0 : 0.15
-      })
+      const boxMat = new THREE.MeshPhysicalMaterial({ color: 0x667eea, metalness: 0.1, roughness: 0.4, clearcoat: 0.2 })
       const box = new THREE.Mesh(boxGeo, boxMat)
-      const edges = new THREE.EdgesGeometry(boxGeo)
-      const lines = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: mobile ? 1 : 2 }))
-      box.add(lines)
+      box.add(new THREE.LineSegments(new THREE.EdgesGeometry(boxGeo), new THREE.LineBasicMaterial({ color: 0xffffff })))
       modelsRef.current.push(box)
 
+      // Pyramid
       const pyrGeo = new THREE.ConeGeometry(1.5, 2.5, 4)
       const pyrMat = new THREE.MeshPhysicalMaterial({ color: 0x22c55e, metalness: 0.1, roughness: 0.4 })
       const pyr = new THREE.Mesh(pyrGeo, pyrMat)
       pyr.add(new THREE.LineSegments(new THREE.EdgesGeometry(pyrGeo), new THREE.LineBasicMaterial({ color: 0xffffff })))
       modelsRef.current.push(pyr)
 
+      // Sphere
       const sphGeo = new THREE.SphereGeometry(1.5, DETAIL.sphereSeg, DETAIL.sphereSeg)
-      const sphMat = new THREE.MeshPhysicalMaterial({ color: 0xf59e0b, metalness: 0.5, roughness: 0.25 })
-      const sph = new THREE.Mesh(sphGeo, sphMat)
-      modelsRef.current.push(sph)
+      const sphMat = new THREE.MeshPhysicalMaterial({ color: 0xf59e0b, metalness: 0.3, roughness: 0.2, clearcoat: 0.4 })
+      modelsRef.current.push(new THREE.Mesh(sphGeo, sphMat))
 
+      // Cylinder
       const cylGeo = new THREE.CylinderGeometry(1, 1, 2.5, DETAIL.cylRadial)
-      const cylMat = new THREE.MeshPhysicalMaterial({ color: 0xec4899, metalness: 0.15, roughness: 0.35 })
-      const cyl = new THREE.Mesh(cylGeo, cylMat)
-      modelsRef.current.push(cyl)
+      const cylMat = new THREE.MeshPhysicalMaterial({ color: 0xec4899, metalness: 0.2, roughness: 0.3 })
+      modelsRef.current.push(new THREE.Mesh(cylGeo, cylMat))
     }
 
+    // --- BIOLOGY ---
     const createBiologyModels = () => {
-      // Cell
+      // 1. Cell
       const cell = new THREE.Group()
+      // Membrane
       const membrane = new THREE.Mesh(
         new THREE.SphereGeometry(1.5, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshPhysicalMaterial({ color: 0xffe0f0, transparent: true, opacity: 0.6, roughness: 0.3 })
+        new THREE.MeshPhysicalMaterial({ color: 0xffe0f0, transparent: true, opacity: 0.5, roughness: 0.2, transmission: 0.2 })
       )
       cell.add(membrane)
-      
+      // Nucleus
       const nucleus = new THREE.Mesh(
-        new THREE.SphereGeometry(0.6, DETAIL.sphereSeg * 0.75, DETAIL.sphereSeg * 0.75),
-        new THREE.MeshStandardMaterial({ color: 0xff6b9d })
+        new THREE.SphereGeometry(0.6, DETAIL.sphereSeg, DETAIL.sphereSeg),
+        new THREE.MeshStandardMaterial({ color: 0xff6b9d, roughness: 0.7 })
       )
       cell.add(nucleus)
-      
-      for (let i = 0; i < DETAIL.mitochondria; i++) {
-        const mito = new THREE.Mesh(
-          new THREE.CapsuleGeometry(0.08, 0.3, 4, 8),
-          new THREE.MeshStandardMaterial({ color: 0x4ecdc4 })
-        )
-        const angle = (i / DETAIL.mitochondria) * Math.PI * 2
-        mito.position.set(Math.cos(angle) * 0.9, Math.sin(angle * 0.5) * 0.4, Math.sin(angle) * 0.9)
-        mito.rotation.set(angle, angle * 0.5, 0)
+      // Mitochondria (randomly placed)
+      for (let i = 0; i < 6; i++) {
+        const mito = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.3, 4, 8), new THREE.MeshStandardMaterial({ color: 0x4ecdc4 }))
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = 0.8 + Math.random() * 0.4;
+        mito.position.set(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+        mito.lookAt(0,0,0);
         cell.add(mito)
       }
-      
       modelsRef.current.push(cell)
 
-      // DNA
+      // 2. DNA (Double Helix)
       const dna = new THREE.Group()
       const points1: THREE.Vector3[] = []
       const points2: THREE.Vector3[] = []
+      const segments = DETAIL.dnaSeg
       
-      for (let i = 0; i < DETAIL.dnaSeg; i++) {
-        const t = (i / DETAIL.dnaSeg) * Math.PI * 4
-        const y = (i / DETAIL.dnaSeg) * 3 - 1.5
-        const x1 = Math.cos(t) * 0.5
-        const z1 = Math.sin(t) * 0.5
-        const x2 = Math.cos(t + Math.PI) * 0.5
-        const z2 = Math.sin(t + Math.PI) * 0.5
+      for (let i = 0; i <= segments; i++) {
+        const t = (i / segments) * Math.PI * 4 // 2 turns
+        const y = (i / segments) * 4 - 2
+        const x1 = Math.cos(t) * 0.6; const z1 = Math.sin(t) * 0.6
+        const x2 = Math.cos(t + Math.PI) * 0.6; const z2 = Math.sin(t + Math.PI) * 0.6
         points1.push(new THREE.Vector3(x1, y, z1))
         points2.push(new THREE.Vector3(x2, y, z2))
       }
-      
       const curve1 = new THREE.CatmullRomCurve3(points1)
       const curve2 = new THREE.CatmullRomCurve3(points2)
       
-      const tubeGeo1 = new THREE.TubeGeometry(curve1, DETAIL.dnaSeg, 0.08, 8, false)
-      const tubeGeo2 = new THREE.TubeGeometry(curve2, DETAIL.dnaSeg, 0.08, 8, false)
+      dna.add(new THREE.Mesh(new THREE.TubeGeometry(curve1, segments, 0.1, 8, false), new THREE.MeshStandardMaterial({ color: 0x4ecdc4 })))
+      dna.add(new THREE.Mesh(new THREE.TubeGeometry(curve2, segments, 0.1, 8, false), new THREE.MeshStandardMaterial({ color: 0xff6b9d })))
       
-      const tube1 = new THREE.Mesh(tubeGeo1, new THREE.MeshStandardMaterial({ color: 0x4ecdc4 }))
-      const tube2 = new THREE.Mesh(tubeGeo2, new THREE.MeshStandardMaterial({ color: 0xff6b9d }))
-      
-      dna.add(tube1, tube2)
-      
-      for (let i = 0; i < points1.length; i += Math.floor(DETAIL.dnaSeg / 10)) {
-        const rung = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.04, 0.04, 1, 6),
-          new THREE.MeshStandardMaterial({ color: 0xffffff })
-        )
-        const mid = new THREE.Vector3().addVectors(points1[i], points2[i]).multiplyScalar(0.5)
-        rung.position.copy(mid)
-        rung.lookAt(points2[i])
-        rung.rotateX(Math.PI / 2)
-        dna.add(rung)
+      // Rungs
+      for (let i = 0; i < points1.length; i += 3) {
+        const p1 = points1[i]; const p2 = points2[i];
+        const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+        const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, p1.distanceTo(p2), 6), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+        rung.position.copy(mid);
+        rung.lookAt(p2);
+        rung.rotateX(Math.PI / 2);
+        dna.add(rung);
       }
-      
       modelsRef.current.push(dna)
 
-      // Heart
+      // 3. Heart (Procedural Shape)
       const heart = new THREE.Group()
-      const shape = new THREE.Shape()
-      shape.moveTo(0, 0)
-      shape.bezierCurveTo(0, -0.3, -0.6, -0.3, -0.6, 0)
-      shape.bezierCurveTo(-0.6, 0.3, 0, 0.6, 0, 1)
-      shape.bezierCurveTo(0, 0.6, 0.6, 0.3, 0.6, 0)
-      shape.bezierCurveTo(0.6, -0.3, 0, -0.3, 0, 0)
-      
-      const extrudeSettings = { depth: 0.4, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1, bevelSegments: mobile ? 2 : 3 }
-      const heartGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-      const heartMesh = new THREE.Mesh(heartGeo, new THREE.MeshStandardMaterial({ color: 0xff1744 }))
-      heartMesh.scale.set(1.5, 1.5, 1.5)
-      heart.add(heartMesh)
-      
+      const x = 0, y = 0;
+      const heartShape = new THREE.Shape();
+      heartShape.moveTo(x + 0.5, y + 0.5);
+      heartShape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y);
+      heartShape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7);
+      heartShape.bezierCurveTo(x - 0.6, y + 1.1, x - 0.3, y + 1.54, x + 0.5, y + 1.9);
+      heartShape.bezierCurveTo(x + 1.2, y + 1.54, x + 1.6, y + 1.1, x + 1.6, y + 0.7);
+      heartShape.bezierCurveTo(x + 1.6, y + 0.7, x + 1.6, y, x + 1, y);
+      heartShape.bezierCurveTo(x + 0.7, y, x + 0.5, y + 0.5, x + 0.5, y + 0.5);
+
+      const geometry = new THREE.ExtrudeGeometry(heartShape, { depth: 0.4, bevelEnabled: true, bevelSegments: 3, steps: 2, bevelSize: 0.1, bevelThickness: 0.1 });
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xff1744, roughness: 0.4 }));
+      mesh.rotation.z = Math.PI; // Flip it
+      mesh.position.y = 1;
+      mesh.scale.set(1.5, 1.5, 1.5);
+      heart.add(mesh);
       modelsRef.current.push(heart)
 
-      // Neuron
+      // 4. Neuron
       const neuron = new THREE.Group()
-      const soma = new THREE.Mesh(
-        new THREE.SphereGeometry(0.4, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0xffeb3b })
-      )
-      neuron.add(soma)
-      
-      for (let i = 0; i < 5; i++) {
-        const angle = (i / 5) * Math.PI * 2
-        const dendrite = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.05, 0.02, 0.8, 6),
-          new THREE.MeshStandardMaterial({ color: 0xffc107 })
-        )
-        dendrite.position.set(Math.cos(angle) * 0.3, 0, Math.sin(angle) * 0.3)
-        dendrite.rotation.z = angle
-        dendrite.rotation.x = Math.PI / 3
-        neuron.add(dendrite)
+      const soma = new THREE.Mesh(new THREE.SphereGeometry(0.5, DETAIL.sphereSeg, DETAIL.sphereSeg), new THREE.MeshStandardMaterial({ color: 0xffeb3b }));
+      neuron.add(soma);
+      // Dendrites
+      for(let i=0; i<8; i++) {
+        const d = new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.2, 5), new THREE.MeshStandardMaterial({ color: 0xffc107 }));
+        d.position.y = 0.5;
+        d.rotation.x = Math.random() * Math.PI;
+        d.rotation.z = Math.random() * Math.PI;
+        neuron.add(d);
       }
-      
-      const axon = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.08, 0.08, 2, 8),
-        new THREE.MeshStandardMaterial({ color: 0xff9800 })
-      )
-      axon.position.y = -1.2
-      neuron.add(axon)
-      
+      // Axon
+      const axon = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 3), new THREE.MeshStandardMaterial({ color: 0xff9800 }));
+      axon.position.y = -1.5;
+      neuron.add(axon);
       modelsRef.current.push(neuron)
     }
 
+    // --- CHEMISTRY ---
     const createChemistryModels = () => {
-      // H2O
+      // 1. H2O
       const h2o = new THREE.Group()
-      const oxygen = new THREE.Mesh(
-        new THREE.SphereGeometry(0.4, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0xff0000 })
-      )
-      h2o.add(oxygen)
+      const o = new THREE.Mesh(new THREE.SphereGeometry(0.5, DETAIL.sphereSeg, DETAIL.sphereSeg), new THREE.MeshStandardMaterial({ color: 0xff0000 }));
+      const h1 = new THREE.Mesh(new THREE.SphereGeometry(0.3, DETAIL.sphereSeg, DETAIL.sphereSeg), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+      const h2 = new THREE.Mesh(new THREE.SphereGeometry(0.3, DETAIL.sphereSeg, DETAIL.sphereSeg), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+      h1.position.set(0.6, 0.4, 0);
+      h2.position.set(-0.6, 0.4, 0);
       
-      const h1 = new THREE.Mesh(
-        new THREE.SphereGeometry(0.25, DETAIL.sphereSeg * 0.75, DETAIL.sphereSeg * 0.75),
-        new THREE.MeshStandardMaterial({ color: 0xffffff })
-      )
-      h1.position.set(0.5, 0.3, 0)
-      h2o.add(h1)
+      const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.7), new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+      b1.position.set(0.3, 0.2, 0); b1.rotation.z = -0.9;
+      const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.7), new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+      b2.position.set(-0.3, 0.2, 0); b2.rotation.z = 0.9;
       
-      const h2 = new THREE.Mesh(
-        new THREE.SphereGeometry(0.25, DETAIL.sphereSeg * 0.75, DETAIL.sphereSeg * 0.75),
-        new THREE.MeshStandardMaterial({ color: 0xffffff })
-      )
-      h2.position.set(-0.5, 0.3, 0)
-      h2o.add(h2)
-      
-      const bond1 = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc })
-      )
-      bond1.position.set(0.25, 0.15, 0)
-      bond1.rotation.z = -Math.PI / 6
-      h2o.add(bond1)
-      
-      const bond2 = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc })
-      )
-      bond2.position.set(-0.25, 0.15, 0)
-      bond2.rotation.z = Math.PI / 6
-      h2o.add(bond2)
-      
-      h2o.scale.set(2, 2, 2)
+      h2o.add(o, h1, h2, b1, b2);
+      h2o.scale.set(1.5, 1.5, 1.5);
       modelsRef.current.push(h2o)
 
-      // CH4
+      // 2. CH4
       const ch4 = new THREE.Group()
-      const carbon = new THREE.Mesh(
-        new THREE.SphereGeometry(0.4, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0x808080 })
-      )
-      ch4.add(carbon)
-      
-      const hPositions = [
-        [0, 0.8, 0],
-        [0.8, -0.3, 0],
-        [-0.4, -0.3, 0.7],
-        [-0.4, -0.3, -0.7]
-      ]
-      
-      hPositions.forEach(pos => {
-        const h = new THREE.Mesh(
-          new THREE.SphereGeometry(0.25, DETAIL.sphereSeg * 0.75, DETAIL.sphereSeg * 0.75),
-          new THREE.MeshStandardMaterial({ color: 0xffffff })
-        )
-        h.position.set(pos[0], pos[1], pos[2])
-        ch4.add(h)
+      const c = new THREE.Mesh(new THREE.SphereGeometry(0.5, DETAIL.sphereSeg, DETAIL.sphereSeg), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+      ch4.add(c);
+      // Tetrahedron positions
+      const positions = [[0.8, 0.8, 0.8], [-0.8, -0.8, 0.8], [0.8, -0.8, -0.8], [-0.8, 0.8, -0.8]];
+      positions.forEach(pos => {
+        const h = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 20), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+        h.position.set(pos[0], pos[1], pos[2]);
+        ch4.add(h);
         
-        const bond = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8),
-          new THREE.MeshStandardMaterial({ color: 0xcccccc })
-        )
-        bond.position.set(pos[0] / 2, pos[1] / 2, pos[2] / 2)
-        bond.lookAt(pos[0], pos[1], pos[2])
-        bond.rotateX(Math.PI / 2)
-        ch4.add(bond)
-      })
-      
-      ch4.scale.set(1.5, 1.5, 1.5)
+        const bond = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1), new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+        bond.position.set(pos[0]/2, pos[1]/2, pos[2]/2);
+        bond.lookAt(pos[0], pos[1], pos[2]);
+        bond.rotateX(Math.PI/2);
+        ch4.add(bond);
+      });
       modelsRef.current.push(ch4)
 
-      // CO2
+      // 3. CO2
       const co2 = new THREE.Group()
-      const carbonC = new THREE.Mesh(
-        new THREE.SphereGeometry(0.4, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0x808080 })
-      )
-      co2.add(carbonC)
+      const c_atom = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+      const o1 = new THREE.Mesh(new THREE.SphereGeometry(0.45, 32, 32), new THREE.MeshStandardMaterial({ color: 0xff0000 }));
+      const o2 = new THREE.Mesh(new THREE.SphereGeometry(0.45, 32, 32), new THREE.MeshStandardMaterial({ color: 0xff0000 }));
+      o1.position.x = 1.2; o2.position.x = -1.2;
       
-      const o1 = new THREE.Mesh(
-        new THREE.SphereGeometry(0.35, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0xff0000 })
-      )
-      o1.position.x = 0.9
-      co2.add(o1)
+      // Double bonds
+      const db1 = new THREE.Group();
+      db1.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,1.2), new THREE.MeshStandardMaterial({color:0xccc})).translateY(0.1));
+      db1.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,1.2), new THREE.MeshStandardMaterial({color:0xccc})).translateY(-0.1));
+      db1.rotation.z = Math.PI/2; db1.position.x = 0.6;
       
-      const o2 = new THREE.Mesh(
-        new THREE.SphereGeometry(0.35, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0xff0000 })
-      )
-      o2.position.x = -0.9
-      co2.add(o2)
+      const db2 = db1.clone(); db2.position.x = -0.6;
       
-      const doubleBond1a = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc })
-      )
-      doubleBond1a.position.set(0.45, 0.05, 0)
-      doubleBond1a.rotation.z = Math.PI / 2
-      co2.add(doubleBond1a)
-      
-      const doubleBond1b = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc })
-      )
-      doubleBond1b.position.set(0.45, -0.05, 0)
-      doubleBond1b.rotation.z = Math.PI / 2
-      co2.add(doubleBond1b)
-      
-      const doubleBond2a = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc })
-      )
-      doubleBond2a.position.set(-0.45, 0.05, 0)
-      doubleBond2a.rotation.z = Math.PI / 2
-      co2.add(doubleBond2a)
-      
-      const doubleBond2b = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc })
-      )
-      doubleBond2b.position.set(-0.45, -0.05, 0)
-      doubleBond2b.rotation.z = Math.PI / 2
-      co2.add(doubleBond2b)
-      
-      co2.scale.set(2, 2, 2)
-      modelsRef.current.push(co2)
+      co2.add(c_atom, o1, o2, db1, db2);
+      modelsRef.current.push(co2);
 
-      // NaCl
+      // 4. NaCl Lattice
       const nacl = new THREE.Group()
-      const latticeSize = DETAIL.naclLattice
-      
-      for (let x = -latticeSize; x <= latticeSize; x++) {
-        for (let y = -latticeSize; y <= latticeSize; y++) {
-          for (let z = -latticeSize; z <= latticeSize; z++) {
-            const isNa = (x + y + z) % 2 === 0
+      const size = DETAIL.naclLattice;
+      for (let x = -size; x <= size; x++) {
+        for (let y = -size; y <= size; y++) {
+          for (let z = -size; z <= size; z++) {
+            const isNa = (x + y + z) % 2 === 0;
             const atom = new THREE.Mesh(
-              new THREE.SphereGeometry(0.25, DETAIL.sphereSeg * 0.75, DETAIL.sphereSeg * 0.75),
-              new THREE.MeshStandardMaterial({ color: isNa ? 0x9c27b0 : 0x4caf50 })
-            )
-            atom.position.set(x * 0.6, y * 0.6, z * 0.6)
-            nacl.add(atom)
+              new THREE.SphereGeometry(0.25, 16, 16),
+              new THREE.MeshStandardMaterial({ color: isNa ? 0x9c27b0 : 0x4caf50 }) // Purple Na, Green Cl
+            );
+            atom.position.set(x * 0.7, y * 0.7, z * 0.7);
+            nacl.add(atom);
+            
+            // Bonds (simplified)
+            if (x < size) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7), new THREE.MeshStandardMaterial({color: 0xddd})); b.position.set(x*0.7+0.35, y*0.7, z*0.7); b.rotation.z = Math.PI/2; nacl.add(b); }
+            if (y < size) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7), new THREE.MeshStandardMaterial({color: 0xddd})); b.position.set(x*0.7, y*0.7+0.35, z*0.7); nacl.add(b); }
+            if (z < size) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7), new THREE.MeshStandardMaterial({color: 0xddd})); b.position.set(x*0.7, y*0.7, z*0.7+0.35); b.rotation.x = Math.PI/2; nacl.add(b); }
           }
         }
       }
-      
-      nacl.scale.set(1.2, 1.2, 1.2)
-      modelsRef.current.push(nacl)
+      modelsRef.current.push(nacl);
     }
 
+    // --- PHYSICS ---
     const createPhysicsModels = () => {
-      // Circuit
+      // 1. Circuit
       const circuit = new THREE.Group()
-      const wiremat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8 })
+      const wireMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8 });
+      // Wires
+      const w1 = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05, 2), wireMat); w1.position.y = 1; w1.rotation.z = Math.PI/2;
+      const w2 = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05, 2), wireMat); w2.position.y = -1; w2.rotation.z = Math.PI/2;
+      const w3 = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05, 2), wireMat); w3.position.x = -1; 
+      const w4 = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05, 2), wireMat); w4.position.x = 1; 
+      // Bulb
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 32, 32), new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.8, transparent: true, opacity: 0.9 }));
+      bulb.position.y = 1;
+      // Battery
+      const bat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+      bat.position.y = -1;
+      const posTerm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.2), new THREE.MeshStandardMaterial({color: 0xcccccc})); posTerm.position.set(0, -0.5, 0);
       
-      const wire1 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2, 8), wiremat)
-      wire1.position.set(-1, 0, 0)
-      wire1.rotation.z = Math.PI / 2
-      circuit.add(wire1)
-      
-      const wire2 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2, 8), wiremat)
-      wire2.position.set(0, 1, 0)
-      circuit.add(wire2)
-      
-      const wire3 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2, 8), wiremat)
-      wire3.position.set(1, 0, 0)
-      wire3.rotation.z = Math.PI / 2
-      circuit.add(wire3)
-      
-      const wire4 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2, 8), wiremat)
-      wire4.position.set(0, -1, 0)
-      circuit.add(wire4)
-      
-      const battery = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.8, 0.3),
-        new THREE.MeshStandardMaterial({ color: 0x212121 })
-      )
-      battery.position.set(0, -1, 0)
-      circuit.add(battery)
-      
-      const bulb = new THREE.Mesh(
-        new THREE.SphereGeometry(0.3, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.5 })
-      )
-      bulb.position.set(0, 1, 0)
-      circuit.add(bulb)
-      
-      modelsRef.current.push(circuit)
+      circuit.add(w1, w2, w3, w4, bulb, bat, posTerm);
+      modelsRef.current.push(circuit);
 
-      // Magnet
-      const magnet = new THREE.Group()
-      const bar = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 1.5, 0.4),
-        new THREE.MeshStandardMaterial({ color: 0xff0000 })
-      )
-      bar.position.y = 0.5
-      magnet.add(bar)
-      
-      const bar2 = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 1.5, 0.4),
-        new THREE.MeshStandardMaterial({ color: 0x0000ff })
-      )
-      bar2.position.y = -0.5
-      magnet.add(bar2)
-      
-      const nLabel = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.2, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0xffffff })
-      )
-      nLabel.position.set(0, 1.1, 0.25)
-      magnet.add(nLabel)
-      
-      const sLabel = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.2, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0xffffff })
-      )
-      sLabel.position.set(0, -1.1, 0.25)
-      magnet.add(sLabel)
-      
-      for (let i = 0; i < 8; i++) {
-        const angle = (i / 8) * Math.PI * 2
-        const curve = new THREE.QuadraticBezierCurve3(
-          new THREE.Vector3(0, 1.2, 0),
-          new THREE.Vector3(Math.cos(angle) * 1.5, 0, Math.sin(angle) * 1.5),
-          new THREE.Vector3(0, -1.2, 0)
-        )
-        const fieldLine = new THREE.Mesh(
-          new THREE.TubeGeometry(curve, 20, 0.02, 8, false),
-          new THREE.MeshBasicMaterial({ color: 0x00ffff })
-        )
-        magnet.add(fieldLine)
-      }
-      
-      modelsRef.current.push(magnet)
-
-      // Wave
-      const wave = new THREE.Group()
-      const wavePoints: THREE.Vector3[] = []
-      
-      for (let i = 0; i < 100; i++) {
-        const x = (i / 100) * 4 - 2
-        const y = Math.sin(x * Math.PI * 2) * 0.5
-        wavePoints.push(new THREE.Vector3(x, y, 0))
-      }
-      
-      const waveCurve = new THREE.CatmullRomCurve3(wavePoints)
-      const waveTube = new THREE.Mesh(
-        new THREE.TubeGeometry(waveCurve, 100, 0.05, 8, false),
-        new THREE.MeshStandardMaterial({ color: 0x00bfff })
-      )
-      wave.add(waveTube)
-      
-      for (let i = 0; i < 20; i++) {
-        const t = i / 20
-        const point = waveCurve.getPoint(t)
-        const particle = new THREE.Mesh(
-          new THREE.SphereGeometry(0.08, 8, 8),
-          new THREE.MeshStandardMaterial({ color: 0xffffff })
-        )
-        particle.position.copy(point)
-        ;(particle as any).userData = { waveOffset: t }
-        wave.add(particle)
-      }
-      
-      modelsRef.current.push(wave)
-
-      // Atom
-      const atom = new THREE.Group()
-      const nucleus = new THREE.Mesh(
-        new THREE.SphereGeometry(0.3, DETAIL.sphereSeg, DETAIL.sphereSeg),
-        new THREE.MeshStandardMaterial({ color: 0xff0000 })
-      )
-      atom.add(nucleus)
-      
-      const orbits = [
-        { radius: 0.8, electrons: 2, color: 0x00ff00, speed: 0.02 },
-        { radius: 1.3, electrons: 8, color: 0x0000ff, speed: 0.015 },
-        { radius: 1.8, electrons: 8, color: 0xffff00, speed: 0.01 }
-      ]
-      
-      orbits.forEach((orbit, idx) => {
-        const orbitRing = new THREE.Mesh(
-          new THREE.TorusGeometry(orbit.radius, 0.02, 8, 32),
-          new THREE.MeshBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.3 })
-        )
-        orbitRing.rotation.x = Math.PI / 2
-        orbitRing.rotation.z = idx * Math.PI / 6
-        atom.add(orbitRing)
-        
-        for (let i = 0; i < orbit.electrons; i++) {
-          const electron = new THREE.Mesh(
-            new THREE.SphereGeometry(0.1, 8, 8),
-            new THREE.MeshStandardMaterial({ color: orbit.color })
-          )
-          const angle = (i / orbit.electrons) * Math.PI * 2
-          electron.position.set(
-            Math.cos(angle) * orbit.radius,
-            0,
-            Math.sin(angle) * orbit.radius
-          )
-          ;(electron as any).userData = { orbit: orbit.radius, speed: orbit.speed, angle, orbitIdx: idx }
-          atom.add(electron)
+      // 2. Magnet
+      const magnet = new THREE.Group();
+      const bar = new THREE.Group();
+      const red = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.5), new THREE.MeshStandardMaterial({ color: 0xff0000 })); red.position.y = 0.5;
+      const blue = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.5), new THREE.MeshStandardMaterial({ color: 0x0000ff })); blue.position.y = -0.5;
+      bar.add(red, blue);
+      magnet.add(bar);
+      // Field lines
+      for(let i=0; i<8; i++) {
+        const angle = (i/8)*Math.PI*2;
+        const pts = [];
+        for(let t=0; t<=Math.PI; t+=0.1) {
+             const r = 1.5 * Math.sin(t);
+             const y = 2.5 * Math.cos(t);
+             pts.push(new THREE.Vector3(r*Math.cos(angle), y, r*Math.sin(angle)));
         }
-      })
+        const line = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 20, 0.02, 4, false), new THREE.MeshBasicMaterial({color: 0x00ffff, transparent: true, opacity: 0.5}));
+        magnet.add(line);
+      }
+      modelsRef.current.push(magnet);
+
+      // 3. Wave
+      const wave = new THREE.Group();
+      const wavePoints: THREE.Vector3[] = [];
+      for(let i=0; i<=50; i++) {
+          wavePoints.push(new THREE.Vector3((i/25)-1, 0, 0)); // base line
+      }
+      const waveCurve = new THREE.CatmullRomCurve3(wavePoints);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(waveCurve, 64, 0.05, 8, false), new THREE.MeshStandardMaterial({color: 0x00bfff}));
+      (tube as any).userData = { isWave: true, originalY: 0 }; // Mark for animation
+      wave.add(tube);
       
-      modelsRef.current.push(atom)
+      // Floating particles
+      for(let i=0; i<15; i++) {
+          const p = new THREE.Mesh(new THREE.SphereGeometry(0.08), new THREE.MeshBasicMaterial({color:0xffffff}));
+          p.position.set((i/7.5)-1, 0, 0);
+          (p as any).userData = { isParticle: true, offset: i };
+          wave.add(p);
+      }
+      modelsRef.current.push(wave);
+
+      // 4. Atom
+      const atom = new THREE.Group();
+      const n = new THREE.Mesh(new THREE.SphereGeometry(0.4, 32, 32), new THREE.MeshStandardMaterial({color: 0xff0000}));
+      atom.add(n);
+      const orbits = [
+          { r: 1.0, speed: 2, color: 0x00ff00 },
+          { r: 1.5, speed: 1.5, color: 0x0000ff },
+          { r: 2.0, speed: 1, color: 0xffff00 }
+      ];
+      orbits.forEach((o, idx) => {
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(o.r, 0.02, 16, 64), new THREE.MeshBasicMaterial({color: 0x444444, transparent: true, opacity: 0.3}));
+          ring.rotation.x = Math.PI/2;
+          ring.rotation.y = idx * Math.PI/4;
+          
+          const electron = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), new THREE.MeshBasicMaterial({color: o.color}));
+          const orbitGroup = new THREE.Group(); // Pivot for rotation
+          orbitGroup.rotation.x = Math.PI/2;
+          orbitGroup.rotation.y = idx * Math.PI/4;
+          
+          electron.position.set(o.r, 0, 0);
+          (orbitGroup as any).userData = { isElectron: true, speed: o.speed };
+          
+          orbitGroup.add(electron);
+          atom.add(ring, orbitGroup);
+      });
+      modelsRef.current.push(atom);
     }
 
-    const createAll = () => {
-      modelsRef.current = []
-      if (subject === 'geometry') createGeometryModels()
-      else if (subject === 'biology') createBiologyModels()
-      else if (subject === 'chemistry') createChemistryModels()
-      else if (subject === 'physics') createPhysicsModels()
-      modelsRef.current.forEach(m => enableShadowsRec(m))
-    }
+    // MAIN GENERATION SWITCH
+    if (subject === 'geometry') createGeometryModels()
+    else if (subject === 'biology') createBiologyModels()
+    else if (subject === 'chemistry') createChemistryModels()
+    else if (subject === 'physics') createPhysicsModels()
 
-    createAll()
-    if (modelsRef.current[0]) scene.add(modelsRef.current[0])
+    // Apply shadows to all
+    modelsRef.current.forEach(m => enableShadowsRec(m))
+    
+    // Add first model
+    if(modelsRef.current[0]) scene.add(modelsRef.current[0])
+
     setTimeout(() => setIsLoading(false), 300)
 
-    // Render loop с оптимизацией
-    let frameId = 0
-    let last = performance.now()
-    const targetFPS = preferLow ? 30 : mobile ? 45 : 60
-    const minInterval = 1000 / targetFPS
-
-    const onVisibility = () => {
-      if (document.hidden) {
-        if (frameId) cancelAnimationFrame(frameId)
-        frameId = 0
-      } else {
-        last = performance.now()
-        animate()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibility)
-
+    // === ANIMATION LOOP (Процедурные анимации) ===
+    let frame = 0;
     const animate = () => {
-      frameId = requestAnimationFrame(animate)
-      const now = performance.now()
-      const dt = now - last
-      if (dt < minInterval) return
-      last = now
+      requestAnimationFrame(animate)
+      frame += 0.01;
 
-      modelsRef.current.forEach((model, idx) => {
-        if (scene.children.includes(model)) {
-          animateModel(model, idx, subject, preferLow || mobile)
-        }
-      })
+      // Update Controls (Auto-rotate)
+      if (controlsRef.current) {
+        controlsRef.current.autoRotate = autoRotate
+        controlsRef.current.update()
+      }
 
-      controls.update()
+      // Physics Animations
+      if (subject === 'physics') {
+         // Wave
+         const waveModel = modelsRef.current[2];
+         if (waveModel && scene.children.includes(waveModel)) {
+             waveModel.children.forEach(c => {
+                 if ((c as any).userData.isParticle) {
+                     c.position.y = Math.sin(frame * 3 + (c as any).userData.offset) * 0.5;
+                 }
+             });
+         }
+         // Atom electrons
+         const atomModel = modelsRef.current[3];
+         if (atomModel && scene.children.includes(atomModel)) {
+             atomModel.children.forEach(c => {
+                 if ((c as any).userData.isElectron) {
+                     c.rotation.z += (c as any).userData.speed * 0.02;
+                 }
+             });
+         }
+      }
+
+      // Biology Animations
+      if (subject === 'biology') {
+          // Heart beat
+          const heartModel = modelsRef.current[2];
+          if (heartModel && scene.children.includes(heartModel)) {
+              const scale = 1.5 + Math.sin(frame * 10) * 0.1;
+              heartModel.scale.set(scale, scale, scale);
+          }
+      }
+
       renderer.render(scene, camera)
     }
     animate()
 
     const onResize = () => {
-      if (!camera || !renderer) return
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
-      const newDPR = preferLow ? 1 : mobile ? 1.5 : Math.min(window.devicePixelRatio, 2)
-      renderer.setPixelRatio(newDPR)
       renderer.setSize(window.innerWidth, window.innerHeight)
     }
     window.addEventListener('resize', onResize)
 
     return () => {
       window.removeEventListener('resize', onResize)
-      document.removeEventListener('visibilitychange', onVisibility)
-      if (frameId) cancelAnimationFrame(frameId)
-
-      modelsRef.current.forEach(m => {
-        scene.remove(m)
-        m.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh
-            if (mesh.geometry) mesh.geometry.dispose()
-            if (Array.isArray(mesh.material)) {
-              mesh.material.forEach(mat => {
-                if ((mat as any).map) (mat as any).map.dispose()
-                mat.dispose()
-              })
-            } else if (mesh.material) {
-              const mat = mesh.material as THREE.Material
-              if ((mat as any)?.map) (mat as any).map.dispose()
-              mat.dispose()
-            }
-          }
-        })
-      })
-
-      if (controls) controls.dispose()
-      if (canvasRef.current && renderer.domElement && canvasRef.current.contains(renderer.domElement)) {
+      renderer.dispose()
+      if (canvasRef.current && renderer.domElement) {
         canvasRef.current.removeChild(renderer.domElement)
       }
-      renderer.dispose()
-      sceneRef.current = null
-      cameraRef.current = null
-      rendererRef.current = null
-      controlsRef.current = null
+      // Очистка памяти
+      modelsRef.current.forEach(m => {
+          m.traverse(c => {
+              if ((c as THREE.Mesh).geometry) (c as THREE.Mesh).geometry.dispose();
+          })
+      })
     }
-  }, [subject, lowQuality])
-
-  const animateModel = (model: THREE.Object3D, index: number, subj: string, isLowPerf: boolean) => {
-    const rotSpeed = isLowPerf ? 0.003 : 0.005
-    model.rotation.y += rotSpeed
-
-    if (subj === 'biology') {
-      if (index === 1) {
-        model.rotation.y += isLowPerf ? 0.008 : 0.01
-        model.position.y = Math.sin(Date.now() * 0.001) * (isLowPerf ? 0.015 : 0.025)
-      } else if (index === 2) {
-        const s = 1 + Math.sin(Date.now() * 0.003) * (isLowPerf ? 0.03 : 0.05)
-        model.scale.set(s, s, s)
-      }
-    } else if (subj === 'physics') {
-      if (index === 2) {
-        const t = Date.now() * 0.001
-        model.children.forEach((child, i) => {
-          if ((child as any).userData?.waveOffset !== undefined) {
-            const offset = (child as any).userData.waveOffset
-            const baseY = Math.sin((offset * 4 - 2) * Math.PI * 2) * 0.5
-            child.position.y = baseY + Math.sin(t * 3 + offset * 10) * (isLowPerf ? 0.1 : 0.15)
-          }
-        })
-      } else if (index === 3) {
-        model.children.forEach(child => {
-          if ((child as any).userData?.orbit) {
-            const data = (child as any).userData
-            data.angle += data.speed
-            const rotMat = new THREE.Matrix4()
-            rotMat.makeRotationZ(data.orbitIdx * Math.PI / 6)
-            const pos = new THREE.Vector3(
-              Math.cos(data.angle) * data.orbit,
-              0,
-              Math.sin(data.angle) * data.orbit
-            )
-            pos.applyMatrix4(rotMat)
-            child.position.copy(pos)
-          }
-        })
-      }
-    }
-  }
+  }, [subject, autoRotate, lowQuality])
 
   const switchModel = (index: number) => {
     if (!sceneRef.current) return
@@ -830,108 +582,91 @@ function Gallery3D() {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
+      
+      {/* Loading Screen */}
       {isLoading && (
         <div style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          background: currentSubject.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 400, color: 'white', fontSize: isMobile ? '1.1rem' : '1.3rem', flexDirection: 'column',
-          padding: '1rem'
+          background: currentSubject.color, zIndex: 100,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white'
         }}>
-          <div style={{ fontSize: isMobile ? '3rem' : '3.5rem', marginBottom: '0.8rem' }}>{currentSubject.emoji}</div>
-          <div style={{ textAlign: 'center' }}>Загрузка 3D - подстраиваемся под устройство...</div>
-          <div style={{ marginTop: 12, fontSize: '0.85rem', opacity: 0.85, textAlign: 'center' }}>
-            {lowQuality ? 'Режим экономии ресурсов' : isMobile ? 'Мобильная оптимизация' : 'Высокое качество'}
-          </div>
+          <div style={{ fontSize: '4rem', marginBottom: '1rem', animation: 'bounce 1s infinite' }}>{currentSubject.emoji}</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>Генерация 3D моделей...</div>
+          <style>{`@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }`}</style>
         </div>
       )}
 
+      {/* Canvas */}
       <div ref={canvasRef} style={{ width: '100%', height: '100%' }} />
 
-      <div style={{ position: 'absolute', top: isMobile ? 10 : 14, left: isMobile ? 10 : 12, zIndex: 410 }}>
-        <Link to="/subjects" className="btn btn-secondary" style={{
-          background: 'rgba(255,255,255,0.95)', color: currentSubject.color,
-          fontSize: isMobile ? '0.8rem' : '0.95rem',
-          padding: isMobile ? '0.5rem 0.8rem' : '0.7rem 1.2rem',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.18)'
-        }}>← К предметам</Link>
+      {/* Верхний бар */}
+      <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 50 }}>
+        <Link to="/subjects" className="btn" style={{ 
+            background: 'rgba(255,255,255,0.9)', color: '#333', textDecoration: 'none', 
+            padding: '8px 16px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 600, 
+            boxShadow: '0 4px 10px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '5px' 
+        }}>
+            <span>←</span> Назад
+        </Link>
       </div>
+      
+      {/* Кнопки качества (только если не на слабом устройстве по умолчанию) */}
+      {!isMobile && (
+          <div style={{ position: 'absolute', top: 16, left: 120, zIndex: 50 }}>
+             <button onClick={() => setLowQuality(!lowQuality)} style={{
+                 background: lowQuality ? '#ff9800' : 'rgba(255,255,255,0.5)', border: 'none', color: 'white',
+                 padding: '8px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem'
+             }}>
+                 {lowQuality ? '⚡ Low Perf' : '✨ High Perf'}
+             </button>
+          </div>
+      )}
 
+      {/* Инфо панель справа (плавающая) */}
       <div style={{
-        position: 'absolute',
-        top: isMobile ? 10 : 20,
-        right: isMobile ? 10 : 20,
-        background: 'rgba(0,0,0,0.85)',
-        color: 'white',
-        padding: isMobile ? '0.6rem' : '1rem',
-        borderRadius: 10,
-        zIndex: 410,
-        maxWidth: isMobile ? '85%' : 320,
-        backdropFilter: 'blur(10px)'
+        position: 'absolute', top: 16, right: 16,
+        background: 'rgba(15, 15, 20, 0.7)', backdropFilter: 'blur(16px)',
+        padding: '20px', borderRadius: '24px', color: 'white', maxWidth: '300px',
+        border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        transition: 'all 0.3s ease'
       }}>
-        <div style={{ fontSize: isMobile ? '1.1rem' : '1.4rem', marginBottom: 6, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span>{currentSubject.emoji}</span>
-          <span>{currentSubject.name}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.5px' }}>
+                {currentSubject.models[currentModel].name}
+            </h2>
+            <button 
+                onClick={() => setAutoRotate(!autoRotate)}
+                style={{ 
+                    background: autoRotate ? '#22c55e' : 'rgba(255,255,255,0.1)', border: 'none', 
+                    color: 'white', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s'
+                }}
+                title={autoRotate ? "Остановить вращение" : "Включить вращение"}
+            >
+                {autoRotate ? '❚❚' : '▶'}
+            </button>
         </div>
-        <div style={{ fontSize: isMobile ? '0.8rem' : '0.95rem', opacity: 0.9, marginBottom: 8 }}>
+        <p style={{ margin: 0, fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5' }}>
           {currentSubject.models[currentModel].description}
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button onClick={() => setLowQuality(q => !q)} style={{
-            padding: isMobile ? '5px 8px' : '6px 10px',
-            fontSize: isMobile ? '0.75rem' : '0.85rem',
-            borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: lowQuality ? '#ff9800' : '#4caf50',
-            color: 'white'
-          }}>
-            {lowQuality ? '⚡ Low' : '✨ High'}
-          </button>
-          <button onClick={() => {
-            if (controlsRef.current) {
-              const ctrl = controlsRef.current as any
-              if (typeof ctrl.reset === 'function') ctrl.reset()
-              ctrl.target.set(0, 0.6, 0)
-            }
-            if (cameraRef.current) cameraRef.current.position.set(0, isMobile ? 1.5 : 1.2, isMobile ? 4 : 6)
-          }} style={{
-            padding: isMobile ? '5px 8px' : '6px 10px',
-            fontSize: isMobile ? '0.75rem' : '0.85rem',
-            borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: '#2196f3', color: 'white'
-          }}>
-            🔄 Сброс
-          </button>
-        </div>
+        </p>
       </div>
 
+      {/* Нижняя панель навигации по моделям */}
       <div style={{
-        position: 'absolute',
-        bottom: isMobile ? 10 : 30,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        gap: isMobile ? '0.4rem' : '0.6rem',
-        background: 'rgba(0,0,0,0.85)',
-        padding: isMobile ? '0.5rem' : '0.9rem',
-        borderRadius: 12,
-        zIndex: 410,
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        width: isMobile ? '96%' : 'auto',
-        maxWidth: isMobile ? '100%' : '90%',
-        backdropFilter: 'blur(10px)'
+        position: 'absolute', bottom: 30, left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', gap: '10px', background: 'rgba(20, 20, 30, 0.85)', padding: '8px 8px', borderRadius: '30px', 
+        backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', 
+        overflowX: 'auto', maxWidth: '95%', scrollbarWidth: 'none',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
       }}>
         {currentSubject.models.map((m: any, i: number) => (
-          <button key={i} onClick={() => switchModel(i)} className="btn" style={{
-            background: currentModel === i ? currentSubject.color : 'rgba(255,255,255,0.1)',
-            color: 'white',
-            border: currentModel === i ? '2px solid #fff' : '2px solid transparent',
-            padding: isMobile ? '0.4rem 0.6rem' : '0.7rem 1rem',
-            fontSize: isMobile ? '0.75rem' : '0.86rem',
-            minWidth: isMobile ? 70 : 84,
-            borderRadius: 10,
-            transition: 'all 0.2s'
+          <button key={i} onClick={() => switchModel(i)} style={{
+            background: currentModel === i ? currentSubject.color : 'transparent',
+            color: 'white', border: 'none', padding: '10px 20px', borderRadius: '24px',
+            cursor: 'pointer', transition: 'all 0.3s', fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap',
+            boxShadow: currentModel === i ? `0 4px 15px ${currentSubject.color}66` : 'none'
           }}>
-            {m.name.split(' ')[0]}
+            {m.name}
           </button>
         ))}
       </div>
