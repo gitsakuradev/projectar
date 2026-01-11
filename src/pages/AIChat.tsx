@@ -32,7 +32,7 @@ function AIChat() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
-  // Инициализация Gemini (Проверка ключа внутри функции отправки)
+  // Инициализация Gemini
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY
   const genAI = new GoogleGenerativeAI(apiKey || '')
 
@@ -63,7 +63,8 @@ function AIChat() {
     setIsLoading(true)
 
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+      // ИСПРАВЛЕНИЕ: Используем 'gemini-pro' вместо 'gemini-1.5-flash', так как она стабильнее
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" })
       
       const systemPrompt = `
         ${SUBJECTS[activeSubject].prompt}
@@ -72,9 +73,7 @@ function AIChat() {
         Отвечай кратко и понятно для школьника.
       `
 
-      // --- ИСПРАВЛЕНИЕ ОШИБКИ ЗДЕСЬ ---
-      // Мы фильтруем историю, убирая приветственное сообщение (id: '1'),
-      // чтобы история для API начиналась с сообщения пользователя.
+      // Фильтруем историю (убираем приветствие модели, так как Google требует начинать с user)
       const apiHistory = messages
         .filter(m => m.id !== '1') 
         .map(m => ({
@@ -100,15 +99,14 @@ function AIChat() {
       console.error("AI Error:", error)
       
       let errorText = 'Произошла ошибка связи.'
-      // Определение типа ошибки для пользователя
-      if (error.message && error.message.includes('400')) errorText = 'Ошибка запроса к API.'
+      if (error.message && error.message.includes('404')) errorText = 'Модель временно недоступна (попробуйте VPN).'
       if (error.message && error.message.includes('fetch')) errorText = 'Нет интернета или Google заблокирован (включи VPN).'
       if (!apiKey) errorText = 'Отсутствует API ключ.'
 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: `⚠️ ${errorText}\n(Попробуйте включить VPN, если вы в РФ)`,
+        text: `⚠️ ${errorText}\n(Техническая ошибка: ${error.message.slice(0, 50)}...)`,
         timestamp: Date.now()
       }])
     } finally {
