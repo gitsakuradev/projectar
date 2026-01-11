@@ -46,7 +46,10 @@ function Markers() {
           color: 'white',
           marginBottom: '2rem',
           display: 'inline-block',
-          border: '2px solid white'
+          border: '2px solid white',
+          padding: '0.8rem 1.5rem',
+          borderRadius: '12px',
+          textDecoration: 'none'
         }}>
           ← Назад к предметам
         </Link>
@@ -67,20 +70,23 @@ function Markers() {
             🎯 AR Маркеры
           </h1>
 
+          {/* Секция инструкции */}
           <div style={{
             background: '#f0f4ff',
             padding: '1.5rem',
-            borderRadius: '12px',
+            borderRadius: '16px',
             border: '2px solid #667eea',
             marginBottom: '2rem'
           }}>
-            <h3 style={{ color: '#667eea', marginBottom: '1rem', fontSize: '1.2rem' }}>
+            <h3 style={{ color: '#667eea', marginBottom: '1rem', fontSize: '1.2rem', marginTop: 0 }}>
               📋 Инструкция
             </h3>
-            <ol style={{ color: '#555', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
-              <li><strong>Распечатайте</strong> один из маркеров ниже.</li>
-              <li><strong>Наведите камеру</strong> в режиме AR Scanner.</li>
-              <li>Для <strong>своих маркеров</strong>: используйте <a href="https://jeromeetienne.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank" rel="noopener noreferrer" style={{color: '#667eea'}}>онлайн-генератор</a>. Сохраните файл <code>.patt</code> и загрузите его прямо в AR режиме.</li>
+            <ol style={{ color: '#555', lineHeight: '1.8', paddingLeft: '1.5rem', margin: 0 }}>
+              <li><strong>Распечатайте</strong> один из стандартных маркеров ниже.</li>
+              <li><strong>Наведите камеру</strong> в режиме AR на распечатанный маркер.</li>
+              <li>Для <strong>своих маркеров</strong>: перейдите в <a href="https://jeromeetienne.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank" rel="noopener noreferrer" style={{color: '#667eea', fontWeight: 'bold'}}>онлайн-генератор</a>.</li>
+              <li>Загрузите любое изображение, настройте и скачайте файл <code>.patt</code>.</li>
+              <li>Загрузите этот файл прямо в приложении (кнопка "Свой маркер").</li>
             </ol>
           </div>
 
@@ -158,10 +164,11 @@ function Markers() {
                       fontWeight: '600',
                       borderRadius: '10px',
                       border: 'none',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)'
                     }}
                   >
-                    📥 Скачать маркер
+                    📥 Скачать изображение
                   </button>
                 </div>
               </div>
@@ -170,7 +177,6 @@ function Markers() {
         </div>
       </div>
 
-      {/* Стили для печати */}
       <style>
         {`
           @media print {
