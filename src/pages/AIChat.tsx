@@ -32,8 +32,9 @@ function AIChat() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
-  // Инициализация Gemini
-  const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '')
+  // Инициализация Gemini (Проверка ключа внутри функции отправки)
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+  const genAI = new GoogleGenerativeAI(apiKey || '')
 
   // Авто-скролл вниз
   useEffect(() => {
@@ -44,8 +45,6 @@ function AIChat() {
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
 
-    // Проверка ключа перед отправкой
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
     if (!apiKey) {
       alert('ОШИБКА: Не найден API ключ! Создайте файл .env с переменной VITE_GEMINI_API_KEY')
       return
@@ -58,6 +57,7 @@ function AIChat() {
       timestamp: Date.now()
     }
 
+    // Добавляем сообщение пользователя в UI
     setMessages(prev => [...prev, userMsg])
     setInputValue('')
     setIsLoading(true)
@@ -72,11 +72,18 @@ function AIChat() {
         Отвечай кратко и понятно для школьника.
       `
 
-      const chat = model.startChat({
-        history: messages.map(m => ({
+      // --- ИСПРАВЛЕНИЕ ОШИБКИ ЗДЕСЬ ---
+      // Мы фильтруем историю, убирая приветственное сообщение (id: '1'),
+      // чтобы история для API начиналась с сообщения пользователя.
+      const apiHistory = messages
+        .filter(m => m.id !== '1') 
+        .map(m => ({
           role: m.role,
           parts: [{ text: m.text }]
         }))
+
+      const chat = model.startChat({
+        history: apiHistory
       })
 
       const result = await chat.sendMessage(systemPrompt + "\nВопрос студента: " + userMsg.text)
@@ -92,16 +99,16 @@ function AIChat() {
     } catch (error: any) {
       console.error("AI Error:", error)
       
-      // Формируем понятный текст ошибки
-      let errorText = 'Произошла ошибка.'
-      if (error.message.includes('400')) errorText = 'Ошибка ключа или запроса (400).'
-      if (error.message.includes('Location')) errorText = 'Google API недоступен в вашем регионе. Включите VPN.'
-      if (error.message.includes('fetch')) errorText = 'Нет интернета или блокировка сети.'
+      let errorText = 'Произошла ошибка связи.'
+      // Определение типа ошибки для пользователя
+      if (error.message && error.message.includes('400')) errorText = 'Ошибка запроса к API.'
+      if (error.message && error.message.includes('fetch')) errorText = 'Нет интернета или Google заблокирован (включи VPN).'
+      if (!apiKey) errorText = 'Отсутствует API ключ.'
 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: `⚠️ Ошибка: ${errorText}\n(Подробности в консоли браузера)`,
+        text: `⚠️ ${errorText}\n(Попробуйте включить VPN, если вы в РФ)`,
         timestamp: Date.now()
       }])
     } finally {
