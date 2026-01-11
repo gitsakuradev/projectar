@@ -47,8 +47,13 @@ function AIChat() {
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
 
-    if (!apiKey) {
-      alert('⚠️ Введите API ключ OpenRouter!\n\n1. Зайдите на https://openrouter.ai/keys\n2. Создайте бесплатный аккаунт\n3. Скопируйте ключ и вставьте в поле выше')
+    if (!apiKey || !apiKey.trim()) {
+      alert('⚠️ Введите API ключ OpenRouter!\n\n1. Зайдите на https://openrouter.ai/settings/keys\n2. Нажмите "Create Key"\n3. Скопируйте ВЕСЬ ключ (начинается с sk-or-v1-)\n4. Вставьте в поле выше')
+      return
+    }
+
+    if (!apiKey.startsWith('sk-or-v1-')) {
+      alert('⚠️ Неправильный формат ключа!\n\nAPI ключ должен начинаться с: sk-or-v1-...\n\nПроверьте, что скопировали весь ключ полностью.')
       return
     }
 
@@ -147,14 +152,14 @@ function AIChat() {
         {showApiInput && (
           <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
-              type="password"
+              type="text"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Вставьте OpenRouter API ключ (https://openrouter.ai/keys)"
+              onChange={(e) => setApiKey(e.target.value.trim())}
+              placeholder="sk-or-v1-... (получить на openrouter.ai/settings/keys)"
               style={{
                 flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)',
                 padding: '10px 14px', borderRadius: '12px', color: 'white', fontSize: '0.9rem',
-                outline: 'none'
+                outline: 'none', fontFamily: 'monospace'
               }}
             />
             <button
