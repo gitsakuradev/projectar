@@ -3,33 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- Важно: user-scalable=no предотвращает зум интерфейса при жестах AR -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>AR Блокнот</title>
     
-    <!-- AR.js и A-Frame - правильный порядок загрузки -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <!-- A-Frame и AR.js -->
+    <!-- Используем стабильные версии -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
-      /* Предотвращение случайных скроллов на мобильных */
       body {
-        touch-action: pan-x pan-y;
-        overscroll-behavior: none;
-        -webkit-user-select: none;
-        user-select: none;
+        margin: 0;
+        overflow: hidden;
+        touch-action: none; /* Отключаем стандартные жесты браузера */
       }
       
-      /* Оптимизация canvas для AR */
-      a-scene canvas {
-        touch-action: none !important;
+      /* Исправление для видео-фона AR.js на мобильных */
+      #arjs-video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: -1 !important;
+        margin: 0 !important;
       }
-      
-      /* Убираем всплывающие элементы AR.js */
-      .a-loader-title,
-      .a-enter-vr-button,
-      .a-dialog {
+
+      /* Скрываем кнопку VR, она не нужна в AR */
+      .a-enter-vr-button {
         display: none !important;
       }
     </style>
