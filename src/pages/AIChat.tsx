@@ -5,6 +5,7 @@ interface Message {
   id: string
   role: 'user' | 'assistant'
   text: string
+  reasoning?: string
   timestamp: number
 }
 
@@ -19,10 +20,16 @@ const SUBJECTS = {
 
 // Доступные модели OpenRouter (бесплатные, работают без VPN)
 const MODELS = [
-  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1' },
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small' },
-  { id: 'meta-llama/llama-3.2-3b-instruct:free', name: 'Llama 3.2 3B' },
-  { id: 'google/gemma-2-9b-it:free', name: 'Gemma 2 9B' }
+  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1', reasoning: false },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small', reasoning: false },
+  { id: 'mistralai/devstral-2512:free', name: 'Mistral Devstral', reasoning: false },
+  { id: 'xiaomi/mimo-v2-flash:free', name: 'Mimo v2', reasoning: true }
+]
+
+// API ключи (случайный выбор)
+const API_KEYS = [
+  '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',
+  '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'
 ]
 
 type SubjectKey = keyof typeof SUBJECTS
@@ -35,8 +42,7 @@ function AIChat() {
   ])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [apiKey, setApiKey] = useState('')
-  const [showApiInput, setShowApiInput] = useState(true)
+  const [showReasoning, setShowReasoning] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -44,18 +50,13 @@ function AIChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Случайный выбор API ключа
+  const getRandomApiKey = () => {
+    return API_KEYS[Math.floor(Math.random() * API_KEYS.length)]
+  }
+
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
-
-    if (!apiKey || !apiKey.trim()) {
-      alert('⚠️ Введите API ключ OpenRouter!\n\n1. Зайдите на https://openrouter.ai/settings/keys\n2. Нажмите "Create Key"\n3. Скопируйте ВЕСЬ ключ (начинается с sk-or-v1-)\n4. Вставьте в поле выше')
-      return
-    }
-
-    if (!apiKey.startsWith('sk-or-v1-')) {
-      alert('⚠️ Неправильный формат ключа!\n\nAPI ключ должен начинаться с: sk-or-v1-...\n\nПроверьте, что скопировали весь ключ полностью.')
-      return
-    }
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -69,6 +70,8 @@ function AIChat() {
     setIsLoading(true)
 
     try {
+      const apiKey = getRandomApiKey()
+      const currentModel = MODELS.find(m => m.id === selectedModel)
       const systemPrompt = `${SUBJECTS[activeSubject].prompt}\n\nОтвечай на русском языке. Используй эмодзи для наглядности. Форматируй ответ красиво. Отвечай кратко и понятно для школьника.`
 
       // Формируем историю для API
@@ -76,22 +79,36 @@ function AIChat() {
         { role: 'system', content: systemPrompt },
         ...messages
           .filter(m => m.id !== '1')
-          .map(m => ({ role: m.role, content: m.text })),
+          .map(m => {
+            const msg: any = { role: m.role, content: m.text }
+            // Для Mimo сохраняем reasoning_details
+            if (m.role === 'assistant' && m.reasoning && currentModel?.reasoning) {
+              msg.reasoning_details = { summary: m.reasoning }
+            }
+            return msg
+          }),
         { role: 'user', content: userMsg.text }
       ]
+
+      // Для Mimo включаем reasoning
+      const requestBody: any = {
+        model: selectedModel,
+        messages: apiMessages
+      }
+
+      if (currentModel?.reasoning) {
+        requestBody.reasoning = { enabled: true }
+      }
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://github.com/yourusername/ai-tutor',
+          'HTTP-Referer': 'https://github.com/ai-tutor',
           'X-Title': 'AI School Tutor',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: apiMessages
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -101,11 +118,13 @@ function AIChat() {
 
       const data = await response.json()
       const aiResponse = data.choices[0]?.message?.content || 'Ошибка: пустой ответ'
+      const reasoning = data.choices[0]?.message?.reasoning_details?.summary || null
 
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         text: aiResponse,
+        reasoning: reasoning,
         timestamp: Date.now()
       }
       setMessages(prev => [...prev, aiMsg])
@@ -113,8 +132,8 @@ function AIChat() {
       console.error('OpenRouter Error:', error)
       
       let errorText = 'Произошла ошибка связи с OpenRouter.'
-      if (error.message.includes('401')) errorText = '❌ Неверный API ключ! Проверьте ключ на openrouter.ai/keys'
-      if (error.message.includes('402')) errorText = '💳 Недостаточно кредитов. Пополните баланс на openrouter.ai'
+      if (error.message.includes('401')) errorText = '❌ Проблема с API ключом'
+      if (error.message.includes('402')) errorText = '💳 Недостаточно кредитов на балансе'
       if (error.message.includes('429')) errorText = '⏳ Превышен лимит запросов. Подождите немного.'
       if (error.message.includes('fetch')) errorText = '🌐 Проблема с интернетом. Проверьте соединение.'
 
@@ -136,6 +155,8 @@ function AIChat() {
     }
   }
 
+  const currentModelHasReasoning = MODELS.find(m => m.id === selectedModel)?.reasoning
+
   return (
     <div style={{ 
       height: '100vh', display: 'flex', flexDirection: 'column', 
@@ -148,48 +169,8 @@ function AIChat() {
         backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)',
         zIndex: 10
       }}>
-        {/* API Key Input */}
-        {showApiInput && (
-          <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <input
-              type="text"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value.trim())}
-              placeholder="sk-or-v1-... (получить на openrouter.ai/settings/keys)"
-              style={{
-                flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)',
-                padding: '10px 14px', borderRadius: '12px', color: 'white', fontSize: '0.9rem',
-                outline: 'none', fontFamily: 'monospace'
-              }}
-            />
-            <button
-              onClick={() => setShowApiInput(false)}
-              style={{
-                padding: '10px 16px', background: apiKey ? '#22c55e' : '#475569',
-                border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer',
-                fontSize: '0.9rem', fontWeight: 500
-              }}
-            >
-              {apiKey ? '✓ Сохранить' : 'Скрыть'}
-            </button>
-          </div>
-        )}
-
-        {!showApiInput && (
-          <button
-            onClick={() => setShowApiInput(true)}
-            style={{
-              marginBottom: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white',
-              cursor: 'pointer', fontSize: '0.85rem'
-            }}
-          >
-            🔑 Изменить API ключ
-          </button>
-        )}
-
         {/* Выбор модели */}
-        <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center' }}>
           {MODELS.map((model) => (
             <button
               key={model.id}
@@ -204,6 +185,19 @@ function AIChat() {
               🤖 {model.name}
             </button>
           ))}
+          {currentModelHasReasoning && (
+            <button
+              onClick={() => setShowReasoning(!showReasoning)}
+              style={{
+                background: showReasoning ? '#22c55e' : 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: 'white', padding: '6px 12px', borderRadius: '16px',
+                cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500
+              }}
+            >
+              🧠 {showReasoning ? 'Скрыть мышление' : 'Показать мышление'}
+            </button>
+          )}
         </div>
 
         {/* Выбор предмета */}
@@ -251,6 +245,22 @@ function AIChat() {
             }}>
               {msg.text}
             </div>
+            {/* Показываем reasoning если включено */}
+            {msg.reasoning && showReasoning && (
+              <div style={{
+                marginTop: '8px',
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                fontSize: '0.85rem',
+                lineHeight: '1.5',
+                whiteSpace: 'pre-wrap'
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: '6px', color: '#22c55e' }}>🧠 Процесс мышления:</div>
+                {msg.reasoning}
+              </div>
+            )}
           </div>
         ))}
         {isLoading && (
