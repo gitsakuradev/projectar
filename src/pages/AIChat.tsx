@@ -26,10 +26,9 @@ const MODELS = [
   { id: 'xiaomi/mimo-v2-flash:free', name: 'Mimo v2', reasoning: true }
 ]
 
-// API ключи (случайный выбор)
-const API_KEYS = [
-  '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',
-  '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'
+// API ключи (случайный выбор) - если не работают, пользователь может ввести свой
+const DEFAULT_API_KEYS = [
+  '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'
 ]
 
 type SubjectKey = keyof typeof SUBJECTS
@@ -43,6 +42,8 @@ function AIChat() {
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showReasoning, setShowReasoning] = useState(false)
+  const [customApiKey, setCustomApiKey] = useState('')
+  const [showApiInput, setShowApiInput] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -50,9 +51,10 @@ function AIChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Случайный выбор API ключа
-  const getRandomApiKey = () => {
-    return API_KEYS[Math.floor(Math.random() * API_KEYS.length)]
+  // Случайный выбор API ключа или использование пользовательского
+  const getApiKey = () => {
+    if (customApiKey.trim()) return customApiKey.trim()
+    return DEFAULT_API_KEYS[Math.floor(Math.random() * DEFAULT_API_KEYS.length)]
   }
 
   const handleSend = async () => {
@@ -70,7 +72,7 @@ function AIChat() {
     setIsLoading(true)
 
     try {
-      const apiKey = getRandomApiKey()
+      const apiKey = getApiKey()
       const currentModel = MODELS.find(m => m.id === selectedModel)
       const systemPrompt = `${SUBJECTS[activeSubject].prompt}\n\nОтвечай на русском языке. Используй эмодзи для наглядности. Форматируй ответ красиво. Отвечай кратко и понятно для школьника.`
 
@@ -169,6 +171,44 @@ function AIChat() {
         backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)',
         zIndex: 10
       }}>
+        {/* API Key Input (опционально) */}
+        {showApiInput ? (
+          <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={customApiKey}
+              onChange={(e) => setCustomApiKey(e.target.value.trim())}
+              placeholder="sk-or-v1-... (если дефолтные ключи не работают)"
+              style={{
+                flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)',
+                padding: '8px 12px', borderRadius: '10px', color: 'white', fontSize: '0.85rem',
+                outline: 'none', fontFamily: 'monospace'
+              }}
+            />
+            <button
+              onClick={() => setShowApiInput(false)}
+              style={{
+                padding: '8px 14px', background: customApiKey ? '#22c55e' : '#475569',
+                border: 'none', borderRadius: '10px', color: 'white', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: 500
+              }}
+            >
+              {customApiKey ? '✓' : '✕'}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowApiInput(true)}
+            style={{
+              marginBottom: '12px', padding: '6px 12px', background: customApiKey ? '#22c55e20' : 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white',
+              cursor: 'pointer', fontSize: '0.8rem'
+            }}
+          >
+            🔑 {customApiKey ? 'Свой API ключ активен' : 'Ввести свой API ключ'}
+          </button>
+        )}
+        
         {/* Выбор модели */}
         <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center' }}>
           {MODELS.map((model) => (
