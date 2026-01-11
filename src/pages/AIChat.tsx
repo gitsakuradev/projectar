@@ -44,6 +44,13 @@ function AIChat() {
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
 
+    // Проверка ключа перед отправкой
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+    if (!apiKey) {
+      alert('ОШИБКА: Не найден API ключ! Создайте файл .env с переменной VITE_GEMINI_API_KEY')
+      return
+    }
+
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -82,12 +89,19 @@ function AIChat() {
         timestamp: Date.now()
       }
       setMessages(prev => [...prev, aiMsg])
-    } catch (error) {
-      console.error(error)
+    } catch (error: any) {
+      console.error("AI Error:", error)
+      
+      // Формируем понятный текст ошибки
+      let errorText = 'Произошла ошибка.'
+      if (error.message.includes('400')) errorText = 'Ошибка ключа или запроса (400).'
+      if (error.message.includes('Location')) errorText = 'Google API недоступен в вашем регионе. Включите VPN.'
+      if (error.message.includes('fetch')) errorText = 'Нет интернета или блокировка сети.'
+
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: 'Ой, произошла ошибка связи с космосом. Попробуй еще раз!',
+        text: `⚠️ Ошибка: ${errorText}\n(Подробности в консоли браузера)`,
         timestamp: Date.now()
       }])
     } finally {
