@@ -14,6 +14,7 @@ declare global {
       'a-cone': any
       'a-torus': any
       'a-dodecahedron': any
+      'a-ring': any
     }
   }
 }
@@ -22,7 +23,7 @@ interface MarkerConfig {
   id: string | number
   type: 'hiro' | 'kanji' | 'pattern'
   patternUrl?: string
-  model: string
+  model: string // Теперь здесь могут быть сложные ключи: 'custom-cell', 'custom-molecule' и т.д.
   color: string
   name: string
   description: string
@@ -35,7 +36,7 @@ const ARScanner: React.FC = () => {
   const [error, setError] = useState('')
   const [showCustomModal, setShowCustomModal] = useState(false)
   
-  // Состояния для Premium фич
+  // Состояния UI
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [flash, setFlash] = useState(false)
   const [activeMarkerId, setActiveMarkerId] = useState<string | number | null>(null)
@@ -47,7 +48,8 @@ const ARScanner: React.FC = () => {
 
   const sceneRef = useRef<any>(null)
 
-  // База данных предметов с описаниями
+  // === ОБНОВЛЕННАЯ БАЗА ДАННЫХ ===
+  // Мы заменили простые модели на ключи для сложных составных моделей
   const subjectData: Record<string, any> = {
     geometry: {
       name: 'Геометрия',
@@ -63,8 +65,10 @@ const ARScanner: React.FC = () => {
       emoji: '🧬',
       color: '#22c55e',
       markers: [
-        { id: 'bio1', type: 'hiro', model: 'sphere', color: '#ff6b9d', name: 'Клетка', description: 'Животная клетка. Элементарная единица строения и жизнедеятельности всех организмов.' },
-        { id: 'bio2', type: 'kanji', model: 'torus', color: '#4ecdc4', name: 'ДНК', description: 'Дезоксирибонуклеиновая кислота. Макромолекула, хранящая генетическую информацию.' },
+        // Изменено на 'custom-cell'
+        { id: 'bio1', type: 'hiro', model: 'custom-cell', color: '#ff6b9d', name: 'Животная Клетка', description: 'Сложная структура с ядром, цитоплазмой и органеллами.' },
+        // Изменено на 'custom-dna'
+        { id: 'bio2', type: 'kanji', model: 'custom-dna', color: '#4ecdc4', name: 'ДНК', description: 'Двойная спираль, хранящая генетический код организма.' },
       ]
     },
     chemistry: {
@@ -72,8 +76,10 @@ const ARScanner: React.FC = () => {
       emoji: '⚗️',
       color: '#f59e0b',
       markers: [
-        { id: 'chem1', type: 'hiro', model: 'sphere', color: '#00bfff', name: 'Молекула', description: 'Электронное облако атома. Демонстрирует вероятность нахождения электрона.' },
-        { id: 'chem2', type: 'kanji', model: 'box', color: '#ff6347', name: 'Кристалл', description: 'Кристаллическая решетка. Упорядоченное расположение атомов в веществе.' },
+        // Изменено на 'custom-atom'
+        { id: 'chem1', type: 'hiro', model: 'custom-atom', color: '#00bfff', name: 'Атом Лития', description: 'Планетарная модель атома: ядро и электроны на орбитах.' },
+        // Изменено на 'custom-h2o'
+        { id: 'chem2', type: 'kanji', model: 'custom-h2o', color: '#ff6347', name: 'Молекула Воды', description: 'H₂O: Один атом кислорода и два атома водорода.' },
       ]
     },
     physics: {
@@ -82,7 +88,7 @@ const ARScanner: React.FC = () => {
       color: '#ec4899',
       markers: [
         { id: 'phys1', type: 'hiro', model: 'torus', color: '#ffd700', name: 'Поле', description: 'Магнитное поле тороидальной катушки с током.' },
-        { id: 'phys2', type: 'kanji', model: 'cylinder', color: '#ff1493', name: 'Сопротивление', description: 'Резистор. Элемент электрической цепи, оказывающий сопротивление току.' },
+        { id: 'phys2', type: 'kanji', model: 'cylinder', color: '#ff1493', name: 'Сопротивление', description: 'Резистор. Элемент электрической цепи.' },
       ]
     }
   }
@@ -90,14 +96,14 @@ const ARScanner: React.FC = () => {
   const currentSubject = subjectData[subject] || subjectData.geometry
   const [activeMarkers, setActiveMarkers] = useState<MarkerConfig[]>([])
 
-  // === 1. Инициализация A-Frame компонентов (Жесты, События) ===
+  // === INITIALIZATION ===
   useEffect(() => {
     setActiveMarkers([...currentSubject.markers])
 
     if (typeof window !== 'undefined' && (window as any).AFRAME) {
       const AFRAME = (window as any).AFRAME
 
-      // Gesture Detector (Определяет касания: один палец или два)
+      // Gesture Components (Те же самые, что и были)
       if (!AFRAME.components['gesture-detector']) {
         AFRAME.registerComponent('gesture-detector', {
           schema: { element: { default: '' } },
@@ -121,7 +127,6 @@ const ARScanner: React.FC = () => {
             const gestureContinues = previousState && currentState && currentState.touchCount == previousState.touchCount
             const gestureEnded = previousState && !gestureContinues
             const gestureStarted = currentState && !gestureContinues
-
             if (gestureEnded) this.el.emit('gesture-end')
             if (gestureStarted) {
               this.internalState.startTime = Date.now()
@@ -131,10 +136,7 @@ const ARScanner: React.FC = () => {
             }
             if (gestureContinues) {
               const stateDelta = {
-                position: {
-                  x: currentState.position.x - previousState.position.x,
-                  y: currentState.position.y - previousState.position.y
-                },
+                position: { x: currentState.position.x - previousState.position.x, y: currentState.position.y - previousState.position.y },
                 spread: currentState.spread - previousState.spread,
                 diff: currentState.spread / previousState.spread
               }
@@ -144,22 +146,14 @@ const ARScanner: React.FC = () => {
           },
           getTouchState: function(event: any) {
             if (event.touches.length === 0) return null
-            if (event.touches.length === 1) {
-              return { touchCount: 1, position: { x: event.touches[0].pageX, y: event.touches[0].pageY }, spread: 1 }
-            }
-            const one = event.touches[0]
-            const two = event.touches[1]
+            if (event.touches.length === 1) return { touchCount: 1, position: { x: event.touches[0].pageX, y: event.touches[0].pageY }, spread: 1 }
+            const one = event.touches[0], two = event.touches[1]
             const spread = Math.sqrt(Math.pow(one.pageX - two.pageX, 2) + Math.pow(one.pageY - two.pageY, 2))
-            return {
-              touchCount: 2,
-              position: { x: (one.pageX + two.pageX) / 2, y: (one.pageY + two.pageY) / 2 },
-              spread: spread
-            }
+            return { touchCount: 2, position: { x: (one.pageX + two.pageX) / 2, y: (one.pageY + two.pageY) / 2 }, spread: spread }
           }
         })
       }
 
-      // Gesture Handler (Применяет вращение и масштаб к модели)
       if (!AFRAME.components['gesture-handler']) {
         AFRAME.registerComponent('gesture-handler', {
           schema: { enabled: { default: true }, rotationFactor: { default: 5 }, minScale: { default: 0.3 }, maxScale: { default: 8 } },
@@ -196,7 +190,6 @@ const ARScanner: React.FC = () => {
         })
       }
 
-      // Marker Events (Связывает AR события с React State)
       if (!AFRAME.components['marker-events']) {
         AFRAME.registerComponent('marker-events', {
           init: function() {
@@ -212,14 +205,10 @@ const ARScanner: React.FC = () => {
       }
     }
 
-    // Слушатели событий
     const onMarkerFound = (e: any) => {
-      const id = e.detail.id
-      setActiveMarkerId(id)
-      // Haptic Feedback (Вибрация)
+      setActiveMarkerId(e.detail.id)
       if (navigator.vibrate) navigator.vibrate(50)
     }
-
     const onMarkerLost = () => {
       setActiveMarkerId(null)
       window.speechSynthesis.cancel()
@@ -229,30 +218,21 @@ const ARScanner: React.FC = () => {
     window.addEventListener('ar-marker-found', onMarkerFound)
     window.addEventListener('ar-marker-lost', onMarkerLost)
 
-    // Запуск камеры
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       .then(() => { setArReady(true); setError('') })
-      .catch((err) => {
-        console.error('Camera error:', err)
-        setError('Не удалось получить доступ к камере. Убедитесь, что используете HTTPS.')
-      })
+      .catch((err) => { console.error(err); setError('Ошибка доступа к камере. Используйте HTTPS.'); })
 
     return () => {
       window.removeEventListener('ar-marker-found', onMarkerFound)
       window.removeEventListener('ar-marker-lost', onMarkerLost)
       window.speechSynthesis.cancel()
-      
       const arVideo = document.getElementById('arjs-video')
       if (arVideo) arVideo.remove()
       document.body.style.overflow = ''
-      document.body.style.width = ''
-      document.body.style.height = ''
     }
   }, [subject])
 
-  // === Функционал ===
-
-  // 1. Text-to-Speech
+  // === ACTIONS ===
   const toggleSpeech = () => {
     if (isSpeaking) {
       window.speechSynthesis.cancel()
@@ -260,37 +240,27 @@ const ARScanner: React.FC = () => {
     } else {
       const marker = activeMarkers.find(m => m.id === activeMarkerId)
       if (marker) {
-        const text = `${marker.name}. ${marker.description}`
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'ru-RU'
-        utterance.onend = () => setIsSpeaking(false)
-        window.speechSynthesis.speak(utterance)
+        const u = new SpeechSynthesisUtterance(`${marker.name}. ${marker.description}`)
+        u.lang = 'ru-RU'
+        u.onend = () => setIsSpeaking(false)
+        window.speechSynthesis.speak(u)
         setIsSpeaking(true)
       }
     }
   }
 
-  // 2. Скриншот
   const takeScreenshot = () => {
-    const sceneEl = sceneRef.current
-    if (sceneEl) {
+    if (sceneRef.current) {
       setFlash(true)
       setTimeout(() => setFlash(false), 300)
-      
-      // Требует preserveDrawingBuffer: true в настройках рендерера
-      const canvas = sceneEl.components.screenshot.getCanvas('perspective')
+      const canvas = sceneRef.current.components.screenshot.getCanvas('perspective')
       setCapturedImage(canvas.toDataURL('image/png'))
     }
   }
 
-  // 3. Загрузка своего маркера
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !file.name.endsWith('.patt')) {
-      alert('Пожалуйста, выберите файл .patt')
-      return
-    }
-
+    if (!file || !file.name.endsWith('.patt')) return
     const newMarker: MarkerConfig = {
       id: `custom-${Date.now()}`,
       type: 'pattern',
@@ -305,24 +275,107 @@ const ARScanner: React.FC = () => {
     setShowCustomModal(false)
   }
 
-  // Рендер 3D моделей
+  // === RENDER MODELS (Самая важная часть!) ===
   const renderModel = (markerData: MarkerConfig) => {
     const { model, color } = markerData
     const commonProps = {
       position: "0 0.5 0",
-      color: color,
-      "gesture-handler": "minScale: 0.2; maxScale: 5", // Подключаем жесты к модели
+      "gesture-handler": "minScale: 0.2; maxScale: 5",
       shadow: "cast: true; receive: false",
       animation: "property: scale; from: 0 0 0; to: 1 1 1; dur: 800; easing: easeOutElastic"
     }
 
     switch (model) {
-      case 'box': return <a-box {...commonProps} />
-      case 'sphere': return <a-sphere {...commonProps} radius="0.5" />
+      // === BIOLOGY: CELL (Сложная клетка) ===
+      case 'custom-cell':
+        return (
+          <a-entity {...commonProps}>
+            {/* Мембрана (полупрозрачная) */}
+            <a-sphere radius="0.7" color="#ff9a9e" opacity="0.4" transparent="true" 
+              material="roughness: 0.1; metalness: 0.1;"
+              animation="property: scale; to: 1.05 1.05 1.05; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine"
+            >
+            </a-sphere>
+            {/* Ядро (твердое) */}
+            <a-sphere radius="0.25" color="#d946ef" position="0 0 0" material="roughness: 0.5" />
+            {/* Органеллы (разбросанные элементы) */}
+            <a-sphere radius="0.08" color="#4ade80" position="0.3 0.2 0.1" />
+            <a-capsule length="0.2" radius="0.06" color="#fcd34d" position="-0.3 -0.1 0.2" rotation="45 45 0" />
+            <a-sphere radius="0.1" color="#60a5fa" position="-0.1 0.3 -0.2" />
+            <a-torus radius="0.15" radius-tubular="0.02" color="#f87171" position="0.1 -0.3 0" rotation="90 0 0" />
+          </a-entity>
+        )
+
+      // === BIOLOGY: DNA (Двойная спираль) ===
+      case 'custom-dna':
+        return (
+          <a-entity {...commonProps} animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
+            {/* Генерируем несколько звеньев спирали */}
+            {[...Array(8)].map((_, i) => {
+              const y = (i - 3.5) * 0.25;
+              const rot = i * 45;
+              return (
+                <a-entity key={i} position={`0 ${y} 0`} rotation={`0 ${rot} 0`}>
+                  {/* Связь */}
+                  <a-cylinder height="0.6" radius="0.03" color="white" rotation="0 0 90" />
+                  {/* Шарики на концах */}
+                  <a-sphere radius="0.1" color="#4ecdc4" position="0.3 0 0" />
+                  <a-sphere radius="0.1" color="#ff6b9d" position="-0.3 0 0" />
+                </a-entity>
+              )
+            })}
+          </a-entity>
+        )
+
+      // === CHEMISTRY: ATOM (Ядро и орбиты) ===
+      case 'custom-atom':
+        return (
+          <a-entity {...commonProps}>
+            {/* Ядро */}
+            <a-sphere radius="0.2" color="#ef4444" position="0 0 0" />
+            <a-sphere radius="0.15" color="#3b82f6" position="0.15 0.1 0" />
+            {/* Орбита 1 */}
+            <a-entity rotation="0 0 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear">
+              <a-ring radius-inner="0.6" radius-outer="0.62" color="#ffffff" opacity="0.5" rotation="90 0 0" />
+              <a-sphere radius="0.08" color="#eab308" position="0.6 0 0" />
+            </a-entity>
+            {/* Орбита 2 (под углом) */}
+            <a-entity rotation="45 0 0" animation="property: rotation; to: 45 360 0; loop: true; dur: 4000; easing: linear">
+              <a-ring radius-inner="0.8" radius-outer="0.82" color="#ffffff" opacity="0.5" rotation="90 0 0" />
+              <a-sphere radius="0.08" color="#eab308" position="-0.8 0 0" />
+            </a-entity>
+          </a-entity>
+        )
+
+      // === CHEMISTRY: H2O (Молекула воды) ===
+      case 'custom-h2o':
+        return (
+          <a-entity {...commonProps} animation__float="property: position; to: 0 0.7 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
+             {/* Кислород (Красный) */}
+             <a-sphere radius="0.35" color="#ef4444" position="0 0 0" material="roughness: 0.1; metalness: 0.1" />
+             
+             {/* Водород 1 */}
+             <a-entity position="0.4 0.3 0" rotation="0 0 -45">
+               <a-cylinder height="0.4" radius="0.05" color="#ddd" position="0 -0.2 0" />
+               <a-sphere radius="0.2" color="white" position="0 0 0" />
+             </a-entity>
+
+             {/* Водород 2 */}
+             <a-entity position="-0.4 0.3 0" rotation="0 0 45">
+               <a-cylinder height="0.4" radius="0.05" color="#ddd" position="0 -0.2 0" />
+               <a-sphere radius="0.2" color="white" position="0 0 0" />
+             </a-entity>
+          </a-entity>
+        )
+
+      // === СТАНДАРТНЫЕ ПРИМИТИВЫ (Для физики, геометрии и кастомных) ===
+      case 'box': return <a-box {...commonProps} material="roughness: 0.5; metalness: 0.1" />
+      case 'sphere': return <a-sphere {...commonProps} radius="0.5" material="roughness: 0.2; metalness: 0.5" />
       case 'cylinder': return <a-cylinder {...commonProps} radius="0.4" height="1" />
       case 'cone': return <a-cone {...commonProps} radius-bottom="0.5" height="1" />
-      case 'torus': return <a-torus {...commonProps} radius="0.4" radius-tubular="0.1" />
+      case 'torus': return <a-torus {...commonProps} radius="0.4" radius-tubular="0.1" color={color} material="metalness: 0.5; roughness: 0.2" />
       case 'dodecahedron': return <a-dodecahedron {...commonProps} radius="0.5" />
+      
       default: return <a-box {...commonProps} />
     }
   }
@@ -350,14 +403,13 @@ const ARScanner: React.FC = () => {
           ref={sceneRef}
           embedded
           arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; maxDetectionRate: 60;"
-          // Важно: preserveDrawingBuffer нужен для скриншотов
           renderer="logarithmicDepthBuffer: true; precision: medium; antialias: true; alpha: true; preserveDrawingBuffer: true;"
           vr-mode-ui="enabled: false"
           gesture-detector
           style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
         >
-          <a-entity light="type: ambient; color: #FFF; intensity: 0.7" />
-          <a-entity light="type: directional; color: #FFF; intensity: 1" position="-1 1 0" />
+          <a-entity light="type: ambient; color: #FFF; intensity: 0.8" />
+          <a-entity light="type: directional; color: #FFF; intensity: 1.2" position="-1 2 1" />
 
           {activeMarkers.map((marker) => (
             <a-marker
@@ -380,7 +432,7 @@ const ARScanner: React.FC = () => {
         </a-scene>
       )}
 
-      {/* Верхняя панель */}
+      {/* HEADER */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, padding: '16px',
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
@@ -394,7 +446,7 @@ const ARScanner: React.FC = () => {
         </button>
       </div>
 
-      {/* Кнопка скриншота (справа) */}
+      {/* SCREENSHOT BUTTON */}
       <div style={{
         position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
         display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 20
@@ -408,7 +460,7 @@ const ARScanner: React.FC = () => {
         </button>
       </div>
 
-      {/* Умная карточка информации (снизу) */}
+      {/* INFO CARD */}
       <div style={{
         position: 'absolute', bottom: '24px', left: '16px', right: '16px',
         background: activeMarkerId ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0,0,0,0.6)',
@@ -447,13 +499,13 @@ const ARScanner: React.FC = () => {
           </div>
         ) : (
           <div style={{ color: 'white', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-            <div className="spinner" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
             <span style={{ fontSize: '0.9rem' }}>Поиск маркера...</span>
           </div>
         )}
       </div>
 
-      {/* Модальное окно скриншота */}
+      {/* SCREENSHOT MODAL */}
       {capturedImage && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)',
@@ -468,7 +520,7 @@ const ARScanner: React.FC = () => {
         </div>
       )}
 
-      {/* Модальное окно загрузки маркера */}
+      {/* UPLOAD MODAL */}
       {showCustomModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#1a1a2e', padding: '24px', borderRadius: '24px', width: '100%', maxWidth: '400px', color: 'white', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
@@ -476,14 +528,12 @@ const ARScanner: React.FC = () => {
             <p style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '1.5rem' }}>
               Загрузите файл <code>.patt</code> и выберите 3D модель.
             </p>
-
             <div style={{ marginBottom: '1.5rem' }}>
               <input ref={fileInputRef} type="file" accept=".patt" onChange={handleFileUpload} style={{ display: 'none' }} />
               <button onClick={() => fileInputRef.current?.click()} style={{ width: '100%', padding: '14px', background: '#22c55e', border: 'none', color: 'white', borderRadius: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 📁 Выбрать .patt файл
               </button>
             </div>
-
             <div style={{ marginBottom: '2rem' }}>
               <label style={{ display: 'block', marginBottom: '0.8rem', fontSize: '0.9rem', color: '#ccc' }}>Выберите модель:</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -498,15 +548,9 @@ const ARScanner: React.FC = () => {
                 ))}
               </div>
             </div>
-
-            <button onClick={() => setShowCustomModal(false)} style={{ width: '100%', padding: '14px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '12px', cursor: 'pointer' }}>
-              Отмена
-            </button>
-            
+            <button onClick={() => setShowCustomModal(false)} style={{ width: '100%', padding: '14px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '12px', cursor: 'pointer' }}>Отмена</button>
             <div style={{ marginTop: '1rem', fontSize: '0.8rem', textAlign: 'center' }}>
-               <a href="https://jeromeetienne.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank" style={{ color: '#667eea' }}>
-                🔗 Генератор маркеров
-               </a>
+               <a href="https://jeromeetienne.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank" style={{ color: '#667eea' }}>🔗 Генератор маркеров</a>
             </div>
           </div>
         </div>
